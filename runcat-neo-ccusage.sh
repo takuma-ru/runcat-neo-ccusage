@@ -16,6 +16,9 @@ CONVERSION_RATE=""
 EXPLICIT_RATE=false
 UNIT=""
 PERIOD="monthly"
+PERIOD_SINCE=""
+PERIOD_UNTIL=""
+CUSTOM_RANGE=false
 INSTALL=false
 UNINSTALL=false
 STATUS=false
@@ -136,6 +139,8 @@ show_help() {
   echo "  -t, --title <title>    Custom card title displayed in RunCat Neo"
   echo "  -s, --symbol <symbol>  Custom SF Symbol identifier (macOS)"
   echo "  -p, --period <period>  Target retrieval period (monthly, weekly, or daily) [default: monthly]"
+  echo "  --period-since <date>  Custom retrieval start date (YYYYMMDD or YYYY-MM-DD)"
+  echo "  --period-until <date>  Custom retrieval end date (YYYYMMDD or YYYY-MM-DD)"
   echo "  -U, --unit <unit>      Unit/currency to display (e.g., USD, JPY, credits, or custom text)"
   echo "  -r, --rate <rate>      Conversion rate from USD (default: 25 for credits, 150 for JPY, 1 for others)"
   echo "  -i, --install          Install this configuration to crontab (runs every 10 minutes)"
@@ -148,10 +153,13 @@ show_help() {
   echo "  $(basename "$0") --agent all"
   echo ""
   echo "  # Track Claude weekly usage in JPY"
-  echo "  $(basename "$0") --agent claude --period weekly --unit JPY"
+  echo "  \$(basename "\$0") --agent claude --period weekly --unit JPY"
+  echo ""
+  echo "  # Track custom billing cycle period (e.g., from 25th to 24th)"
+  echo "  \$(basename "\$0") --agent claude --period-since 20260625 --period-until 20260724"
   echo ""
   echo "  # Track Codex monthly usage converted to credits (default behavior for codex)"
-  echo "  $(basename "$0") --agent codex"
+  echo "  \$(basename "\$0") --agent codex"
   echo ""
   echo "  # Install Claude monitoring to crontab"
   echo "  $(basename "$0") --agent claude --install"
@@ -167,6 +175,8 @@ while [[ "$#" -gt 0 ]]; do
     -t|--title) TITLE="$2"; shift ;;
     -s|--symbol) SYMBOL="$2"; shift ;;
     -p|--period) PERIOD="$2"; shift ;;
+    --period-since) PERIOD_SINCE="$2"; CUSTOM_RANGE=true; shift ;;
+    --period-until) PERIOD_UNTIL="$2"; CUSTOM_RANGE=true; shift ;;
     -r|--rate) CONVERSION_RATE="$2"; EXPLICIT_RATE=true; shift ;;
     -U|--unit) UNIT="$2"; shift ;;
     -i|--install) INSTALL=true ;;
@@ -239,33 +249,48 @@ fi
 # --- Determine Period Configuration ---
 PERIOD_LOWER=$(echo "$PERIOD" | tr '[:upper:]' '[:lower:]')
 
-case "$PERIOD_LOWER" in
-  daily)
-    CURRENT_DATE=$(date +%Y-%m-%d)
-    JSON_ARRAY_KEY="daily"
-    DATE_FIELD_QUERY=".date // .period"
-    PERIOD_LABEL="Daily"
-    START_DATE=$(date +%Y/%m/%d)
-    END_DATE=$(date +%Y/%m/%d)
-    ;;
-  weekly)
-    CURRENT_DATE=$(date -v-sun +%Y-%m-%d)
-    JSON_ARRAY_KEY="weekly"
-    DATE_FIELD_QUERY=".week // .period"
-    PERIOD_LABEL="Weekly"
-    START_DATE=$(date -v-sun +%Y/%m/%d)
-    END_DATE=$(date -v+sat +%Y/%m/%d)
-    ;;
-  monthly|*)
-    PERIOD="monthly"
-    CURRENT_DATE=$(date +%Y-%m)
-    JSON_ARRAY_KEY="monthly"
-    DATE_FIELD_QUERY=".month // .period"
-    PERIOD_LABEL="Monthly"
-    START_DATE=$(date -v1d +%Y/%m/%d)
-    END_DATE=$(date -v+1m -v1d -v-1d +%Y/%m/%d)
-    ;;
-esac
+if [ "$CUSTOM_RANGE" = true ]; then
+  # Fill in defaults if only one of them is provided
+  if [ -z "$PERIOD_SINCE" ]; then
+    PERIOD_SINCE=$(date -v-1m +%Y%m%d)
+  fi
+  if [ -z "$PERIOD_UNTIL" ]; then
+    PERIOD_UNTIL=$(date +%Y%m%d)
+  fi
+
+  # Format for display (YYYY/MM/DD)
+  START_DATE=$(echo "$PERIOD_SINCE" | tr -d '-' | sed 's/\(....\)\(..\)\(..\)/\1\/\2\/\3/')
+  END_DATE=$(echo "$PERIOD_UNTIL" | tr -d '-' | sed 's/\(....\)\(..\)\(..\)/\1\/\2\/\3/')
+  PERIOD_LABEL="Custom"
+else
+  case "$PERIOD_LOWER" in
+    daily)
+      CURRENT_DATE=$(date +%Y-%m-%d)
+      JSON_ARRAY_KEY="daily"
+      DATE_FIELD_QUERY=".date // .period"
+      PERIOD_LABEL="Daily"
+      START_DATE=$(date +%Y/%m/%d)
+      END_DATE=$(date +%Y/%m/%d)
+      ;;
+    weekly)
+      CURRENT_DATE=$(date -v-sun +%Y-%m-%d)
+      JSON_ARRAY_KEY="weekly"
+      DATE_FIELD_QUERY=".week // .period"
+      PERIOD_LABEL="Weekly"
+      START_DATE=$(date -v-sun +%Y/%m/%d)
+      END_DATE=$(date -v+sat +%Y/%m/%d)
+      ;;
+    monthly|*)
+      PERIOD="monthly"
+      CURRENT_DATE=$(date +%Y-%m)
+      JSON_ARRAY_KEY="monthly"
+      DATE_FIELD_QUERY=".month // .period"
+      PERIOD_LABEL="Monthly"
+      START_DATE=$(date -v1d +%Y/%m/%d)
+      END_DATE=$(date -v+1m -v1d -v-1d +%Y/%m/%d)
+      ;;
+  esac
+fi
 
 # --- File System Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -288,7 +313,11 @@ EXEC_CMD="$EXEC_CMD --unit \"$UNIT\""
 if [ "$EXPLICIT_RATE" = true ]; then
   EXEC_CMD="$EXEC_CMD --rate $CONVERSION_RATE"
 fi
-EXEC_CMD="$EXEC_CMD --period \"$PERIOD\""
+if [ "$CUSTOM_RANGE" = true ]; then
+  EXEC_CMD="$EXEC_CMD --period-since \"$PERIOD_SINCE\" --period-until \"$PERIOD_UNTIL\""
+else
+  EXEC_CMD="$EXEC_CMD --period \"$PERIOD\""
+fi
 
 CRON_LINE="*/10 * * * * $EXEC_CMD > /dev/null 2>&1"
 
@@ -338,25 +367,39 @@ if ! command -v jq &> /dev/null; then
 fi
 
 # Fetch from ccusage
-if [ "$AGENT" = "all" ]; then
-  USAGE_JSON=$(ccusage "$PERIOD" --json)
+if [ "$CUSTOM_RANGE" = true ]; then
+  if [ "$AGENT" = "all" ]; then
+    USAGE_JSON=$(ccusage --since "$PERIOD_SINCE" --until "$PERIOD_UNTIL" --json)
+  else
+    USAGE_JSON=$(ccusage "$AGENT" --since "$PERIOD_SINCE" --until "$PERIOD_UNTIL" --json)
+  fi
 else
-  USAGE_JSON=$(ccusage "$AGENT" "$PERIOD" --json)
+  if [ "$AGENT" = "all" ]; then
+    USAGE_JSON=$(ccusage "$PERIOD" --json)
+  else
+    USAGE_JSON=$(ccusage "$AGENT" "$PERIOD" --json)
+  fi
 fi
 
 if [ -z "$USAGE_JSON" ] || ! jq -e . >/dev/null 2>&1 <<<"$USAGE_JSON"; then
   COST_USD=0
   TOTAL_TOKENS=0
 else
-  LAST_DATE=$(echo "$USAGE_JSON" | jq -r ".${JSON_ARRAY_KEY}[-1]? | ${DATE_FIELD_QUERY} // \"\"" 2>/dev/null)
-
-  # Calendar/Period alignment check
-  if [ "$LAST_DATE" = "$CURRENT_DATE" ]; then
-    COST_USD=$(echo "$USAGE_JSON" | jq ".${JSON_ARRAY_KEY}[-1]?.totalCost // .${JSON_ARRAY_KEY}[-1]?.costUSD // 0" 2>/dev/null)
-    TOTAL_TOKENS=$(echo "$USAGE_JSON" | jq ".${JSON_ARRAY_KEY}[-1]?.totalTokens // 0" 2>/dev/null)
+  if [ "$CUSTOM_RANGE" = true ]; then
+    # Custom range directly utilizes the aggregated "totals" object
+    COST_USD=$(echo "$USAGE_JSON" | jq ".totals?.totalCost // .totals?.costUSD // 0" 2>/dev/null)
+    TOTAL_TOKENS=$(echo "$USAGE_JSON" | jq ".totals?.totalTokens // 0" 2>/dev/null)
   else
-    COST_USD=0
-    TOTAL_TOKENS=0
+    LAST_DATE=$(echo "$USAGE_JSON" | jq -r ".${JSON_ARRAY_KEY}[-1]? | ${DATE_FIELD_QUERY} // \"\"" 2>/dev/null)
+
+    # Calendar/Period alignment check
+    if [ "$LAST_DATE" = "$CURRENT_DATE" ]; then
+      COST_USD=$(echo "$USAGE_JSON" | jq ".${JSON_ARRAY_KEY}[-1]?.totalCost // .${JSON_ARRAY_KEY}[-1]?.costUSD // 0" 2>/dev/null)
+      TOTAL_TOKENS=$(echo "$USAGE_JSON" | jq ".${JSON_ARRAY_KEY}[-1]?.totalTokens // 0" 2>/dev/null)
+    else
+      COST_USD=0
+      TOTAL_TOKENS=0
+    fi
   fi
 fi
 
