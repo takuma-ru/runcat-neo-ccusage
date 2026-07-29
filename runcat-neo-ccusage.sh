@@ -191,7 +191,15 @@ UNIT_LOWER=$(echo "$UNIT" | tr '[:upper:]' '[:lower:]')
 if [ "$EXPLICIT_RATE" = false ]; then
   case "$UNIT_LOWER" in
     usd) CONVERSION_RATE=1 ;;
-    jpy) CONVERSION_RATE=150 ;; # Default USD to JPY rate
+    jpy)
+      # Attempt to fetch real-time USD/JPY rate from a free public API (with 2s timeout)
+      FETCHED_RATE=$(curl -s --connect-timeout 2 "https://open.er-api.com/v6/latest/USD" | jq '.rates.JPY // empty' 2>/dev/null)
+      if [[ "$FETCHED_RATE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        CONVERSION_RATE="$FETCHED_RATE"
+      else
+        CONVERSION_RATE=150 # Fallback default
+      fi
+      ;;
     credits) CONVERSION_RATE=25 ;;
     *) CONVERSION_RATE=1 ;;
   esac
