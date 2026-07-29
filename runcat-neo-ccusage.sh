@@ -15,6 +15,7 @@ SYMBOL=""
 CONVERSION_RATE=""
 EXPLICIT_RATE=false
 UNIT=""
+PERIOD="monthly"
 INSTALL=false
 UNINSTALL=false
 STATUS=false
@@ -112,6 +113,7 @@ show_help() {
   echo "  -a, --agent <name>    Agent to track (e.g., claude, codex, gemini, copilot, or all) [default: all]"
   echo "  -t, --title <title>    Custom card title displayed in RunCat Neo"
   echo "  -s, --symbol <symbol>  Custom SF Symbol identifier (macOS)"
+  echo "  -p, --period <period>  Target retrieval period (monthly, weekly, or daily) [default: monthly]"
   echo "  -U, --unit <unit>      Unit/currency to display (e.g., USD, JPY, credits, or custom text)"
   echo "  -r, --rate <rate>      Conversion rate from USD (default: 25 for credits, 150 for JPY, 1 for others)"
   echo "  -i, --install          Install this configuration to crontab (runs every 10 minutes)"
@@ -123,8 +125,8 @@ show_help() {
   echo "  # Track global monthly usage (All Agents) in USD"
   echo "  $(basename "$0") --agent all"
   echo ""
-  echo "  # Track Claude monthly usage in JPY with a conversion rate of 150"
-  echo "  $(basename "$0") --agent claude --unit JPY --rate 150"
+  echo "  # Track Claude weekly usage in JPY"
+  echo "  $(basename "$0") --agent claude --period weekly --unit JPY"
   echo ""
   echo "  # Track Codex monthly usage converted to credits (default behavior for codex)"
   echo "  $(basename "$0") --agent codex"
@@ -142,6 +144,7 @@ while [[ "$#" -gt 0 ]]; do
     -a|--agent) AGENT="$2"; shift ;;
     -t|--title) TITLE="$2"; shift ;;
     -s|--symbol) SYMBOL="$2"; shift ;;
+    -p|--period) PERIOD="$2"; shift ;;
     -r|--rate) CONVERSION_RATE="$2"; EXPLICIT_RATE=true; shift ;;
     -U|--unit) UNIT="$2"; shift ;;
     -i|--install) INSTALL=true ;;
@@ -211,6 +214,31 @@ if [ "$EXPLICIT_RATE" = false ]; then
   esac
 fi
 
+# --- Determine Period Configuration ---
+PERIOD_LOWER=$(echo "$PERIOD" | tr '[:upper:]' '[:lower:]')
+
+case "$PERIOD_LOWER" in
+  daily)
+    CURRENT_DATE=$(date +%Y-%m-%d)
+    JSON_ARRAY_KEY="daily"
+    DATE_FIELD_QUERY=".date // .period"
+    PERIOD_LABEL="Daily"
+    ;;
+  weekly)
+    CURRENT_DATE=$(date -v-sun +%Y-%m-%d)
+    JSON_ARRAY_KEY="weekly"
+    DATE_FIELD_QUERY=".week // .period"
+    PERIOD_LABEL="Weekly"
+    ;;
+  monthly|*)
+    PERIOD="monthly"
+    CURRENT_DATE=$(date +%Y-%m)
+    JSON_ARRAY_KEY="monthly"
+    DATE_FIELD_QUERY=".month // .period"
+    PERIOD_LABEL="Monthly"
+    ;;
+esac
+
 # --- File System Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR"
@@ -232,6 +260,7 @@ EXEC_CMD="$EXEC_CMD --unit \"$UNIT\""
 if [ "$EXPLICIT_RATE" = true ]; then
   EXEC_CMD="$EXEC_CMD --rate $CONVERSION_RATE"
 fi
+EXEC_CMD="$EXEC_CMD --period \"$PERIOD\""
 
 CRON_LINE="*/10 * * * * $EXEC_CMD > /dev/null 2>&1"
 
@@ -282,22 +311,21 @@ fi
 
 # Fetch from ccusage
 if [ "$AGENT" = "all" ]; then
-  USAGE_JSON=$(ccusage monthly --json)
+  USAGE_JSON=$(ccusage "$PERIOD" --json)
 else
-  USAGE_JSON=$(ccusage "$AGENT" monthly --json)
+  USAGE_JSON=$(ccusage "$AGENT" "$PERIOD" --json)
 fi
 
 if [ -z "$USAGE_JSON" ] || ! jq -e . >/dev/null 2>&1 <<<"$USAGE_JSON"; then
   COST_USD=0
   TOTAL_TOKENS=0
 else
-  CURRENT_MONTH=$(date +%Y-%m)
-  LAST_MONTH=$(echo "$USAGE_JSON" | jq -r '.monthly[-1]?.month // .monthly[-1]?.period // ""' 2>/dev/null)
+  LAST_DATE=$(echo "$USAGE_JSON" | jq -r ".${JSON_ARRAY_KEY}[-1]? | ${DATE_FIELD_QUERY} // \"\"" 2>/dev/null)
 
-  # Calendar-month alignment check
-  if [ "$LAST_MONTH" = "$CURRENT_MONTH" ]; then
-    COST_USD=$(echo "$USAGE_JSON" | jq '.monthly[-1]?.totalCost // .monthly[-1]?.costUSD // 0' 2>/dev/null)
-    TOTAL_TOKENS=$(echo "$USAGE_JSON" | jq '.monthly[-1]?.totalTokens // 0' 2>/dev/null)
+  # Calendar/Period alignment check
+  if [ "$LAST_DATE" = "$CURRENT_DATE" ]; then
+    COST_USD=$(echo "$USAGE_JSON" | jq ".${JSON_ARRAY_KEY}[-1]?.totalCost // .${JSON_ARRAY_KEY}[-1]?.costUSD // 0" 2>/dev/null)
+    TOTAL_TOKENS=$(echo "$USAGE_JSON" | jq ".${JSON_ARRAY_KEY}[-1]?.totalTokens // 0" 2>/dev/null)
   else
     COST_USD=0
     TOTAL_TOKENS=0
@@ -358,7 +386,6 @@ JSON_FORMATTED_VALUE="${PREFIX_SYMBOL}${FORMATTED_VALUE}${SUFFIX_LABEL}"
 
 FORMATTED_TOKENS=$(printf "%d" "$TOTAL_TOKENS")
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-NEXT_RESET="$(date -v+1m -v1d +%Y/%m/%d)"
 
 # Export variables for jq
 export RUNCAT_TITLE="$TITLE"
@@ -368,7 +395,8 @@ export RUNCAT_LAST_UPDATED="$TIMESTAMP"
 export RUNCAT_CREDIT_TITLE="$CREDIT_TITLE"
 export RUNCAT_CREDIT_VAL="$JSON_FORMATTED_VALUE"
 export RUNCAT_TOKENS_VAL="$FORMATTED_TOKENS"
-export RUNCAT_NEXT_RESET="$NEXT_RESET"
+export RUNCAT_PERIOD_TITLE="Period"
+export RUNCAT_PERIOD_VAL="${PERIOD_LABEL} (${CURRENT_DATE})"
 
 # Generate RunCat Neo Custom Metrics JSON
 jq -n '
@@ -379,16 +407,16 @@ jq -n '
   "lastUpdatedDate": env.RUNCAT_LAST_UPDATED,
   "metrics": [
     {
-      "title": env.RUNCAT_CREDIT_TITLE,
-      "formattedValue": env.RUNCAT_CREDIT_VAL
-    },
-    {
       "title": "Tokens",
       "formattedValue": env.RUNCAT_TOKENS_VAL
     },
     {
-      "title": "Next reset",
-      "formattedValue": env.RUNCAT_NEXT_RESET
+      "title": env.RUNCAT_CREDIT_TITLE,
+      "formattedValue": env.RUNCAT_CREDIT_VAL
+    },
+    {
+      "title": env.RUNCAT_PERIOD_TITLE,
+      "formattedValue": env.RUNCAT_PERIOD_VAL
     }
   ]
 }
@@ -397,4 +425,4 @@ jq -n '
 # Atomically replace JSON
 mv "$TEMP_FILE" "$OUTPUT_FILE"
 
-echo "Successfully updated $TITLE monthly metrics at $OUTPUT_FILE"
+echo "Successfully updated $TITLE $PERIOD metrics at $OUTPUT_FILE"
