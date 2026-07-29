@@ -16,6 +16,90 @@ CREDIT_RATE=25
 USE_CREDITS=""
 INSTALL=false
 UNINSTALL=false
+STATUS=false
+
+# --- Status Dashboard ---
+show_status() {
+  echo "RunCat Neo Custom Metrics Status"
+  echo "================================="
+  echo ""
+
+  # 1. Check Tools
+  echo "[System Tools]"
+  if command -v ccusage &>/dev/null; then
+    echo "  - ccusage : Installed ($(command -v ccusage))"
+  else
+    echo "  - ccusage : NOT FOUND"
+  fi
+  if command -v jq &>/dev/null; then
+    echo "  - jq      : Installed ($(command -v jq))"
+  else
+    echo "  - jq      : NOT FOUND"
+  fi
+  echo ""
+
+  # 2. Check Crontab Setup
+  echo "[Crontab Configurations]"
+  CRON_JOBS=$(crontab -l 2>/dev/null | grep -F "$SCRIPT_PATH" || true)
+  if [ -z "$CRON_JOBS" ]; then
+    echo "  No active cron jobs found for this script."
+  else
+    while IFS= read -r line; do
+      # Extract agent name from cron line
+      local agent_name="all"
+      if [[ "$line" =~ --agent\ ([a-zA-Z0-9_-]+) ]]; then
+        agent_name="${BASH_REMATCH[1]}"
+      fi
+      echo "  - $agent_name Tracker : Enabled"
+      echo "    Line: $line"
+    done <<< "$CRON_JOBS"
+  fi
+  echo ""
+
+  # 3. Check JSON Files
+  echo "[Metrics Outputs]"
+  local files=("$SCRIPT_DIR"/runcat_*_metrics.json)
+  local found_files=false
+  for f in "${files[@]}"; do
+    if [ -f "$f" ]; then
+      found_files=true
+      local filename=$(basename "$f")
+      echo "  - $filename:"
+
+      # Last modified time (macOS / BSD compatible)
+      local mod_time=""
+      if [ "$(uname)" = "Darwin" ]; then
+        mod_time=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$f" 2>/dev/null)
+      else
+        mod_time=$(date -r "$f" "+%Y-%m-%d %H:%M:%S" 2>/dev/null)
+      fi
+
+      echo "    Last Updated : $mod_time"
+
+      # Content summary
+      local title=$(jq -r '.title // "N/A"' "$f" 2>/dev/null)
+      local symbol=$(jq -r '.symbol // "N/A"' "$f" 2>/dev/null)
+      local bar_val=$(jq -r '.metricsBarValue // "N/A"' "$f" 2>/dev/null)
+
+      echo "    Title        : $title"
+      echo "    Symbol       : $symbol"
+      echo "    Bar Value    : $bar_val"
+
+      # Print metrics list
+      echo "    Details      :"
+      jq -c '.metrics[]?' "$f" 2>/dev/null | while read -r metric; do
+        local m_title=$(echo "$metric" | jq -r '.title // ""' 2>/dev/null)
+        local m_val=$(echo "$metric" | jq -r '.formattedValue // ""' 2>/dev/null)
+        echo "      * $m_title: $m_val"
+      done
+      echo ""
+    fi
+  done
+
+  if [ "$found_files" = false ]; then
+    echo "  No generated metrics JSON files found."
+  fi
+}
 
 # --- Help Message ---
 show_help() {
@@ -31,6 +115,7 @@ show_help() {
   echo "  -c, --credits          Display metrics as credits instead of USD"
   echo "  -i, --install          Install this configuration to crontab (runs every 10 minutes)"
   echo "  -u, --uninstall        Remove this configuration from crontab"
+  echo "  status, --status       Show the status of active cron jobs and metrics files"
   echo "  -h, --help             Show this help message"
   echo ""
   echo "Examples:"
@@ -46,8 +131,8 @@ show_help() {
   echo "  # Install Claude monitoring to crontab"
   echo "  $(basename "$0") --agent claude --install"
   echo ""
-  echo "  # Remove Codex monitoring from crontab"
-  echo "  $(basename "$0") --agent codex --uninstall"
+  echo "  # Check system status and generated files"
+  echo "  $(basename "$0") status"
 }
 
 # --- Parse Arguments ---
@@ -60,6 +145,7 @@ while [[ "$#" -gt 0 ]]; do
     -c|--credits) USE_CREDITS="true" ;;
     -i|--install) INSTALL=true ;;
     -u|--uninstall) UNINSTALL=true ;;
+    status|--status) STATUS=true ;;
     -h|--help) show_help; exit 0 ;;
     *) echo "Error: Unknown option $1" >&2; show_help; exit 1 ;;
   esac
@@ -144,6 +230,11 @@ install_cron() {
   echo "Cron job will run every 10 minutes:"
   echo "  $CRON_LINE"
 }
+
+if [ "$STATUS" = true ]; then
+  show_status
+  exit 0
+fi
 
 if [ "$UNINSTALL" = true ]; then
   uninstall_cron

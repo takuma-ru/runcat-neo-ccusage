@@ -30,6 +30,9 @@ Run the script manually to generate the metrics JSON file:
 
 # Track Codex (Credits)
 ./runcat-neo-ccusage.sh --agent codex
+
+# Check system status, active cron jobs, and generated metrics
+./runcat-neo-ccusage.sh status
 ```
 
 ### Automation (crontab)
