@@ -99,12 +99,13 @@ if [ -z "$USE_CREDITS" ]; then
 fi
 
 # --- File System Configuration ---
-OUTPUT_DIR="$HOME/.config/run-cat-neo"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_DIR="$SCRIPT_DIR"
 OUTPUT_FILE="$OUTPUT_DIR/runcat_${AGENT}_metrics.json"
 TEMP_FILE="${OUTPUT_FILE}.tmp"
 
 # --- Cron Self-Management ---
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_PATH="$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")"
 
 # Reconstruct installation command arguments
 EXEC_CMD="$SCRIPT_PATH --agent $AGENT"
