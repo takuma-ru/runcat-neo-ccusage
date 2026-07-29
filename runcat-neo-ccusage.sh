@@ -186,22 +186,28 @@ if [ -z "$UNIT" ]; then
 fi
 
 UNIT_LOWER=$(echo "$UNIT" | tr '[:upper:]' '[:lower:]')
+UNIT_UPPER=$(echo "$UNIT" | tr '[:lower:]' '[:upper:]')
 
 # Determine Default Rate if not explicitly provided
 if [ "$EXPLICIT_RATE" = false ]; then
   case "$UNIT_LOWER" in
     usd) CONVERSION_RATE=1 ;;
-    jpy)
-      # Attempt to fetch real-time USD/JPY rate from a free public API (with 2s timeout)
-      FETCHED_RATE=$(curl -s --connect-timeout 2 "https://open.er-api.com/v6/latest/USD" | jq '.rates.JPY // empty' 2>/dev/null)
+    credits) CONVERSION_RATE=25 ;;
+    *)
+      # Attempt to fetch real-time rate for ANY currency code dynamically from public API (with 2s timeout)
+      FETCHED_RATE=$(curl -s --connect-timeout 2 "https://open.er-api.com/v6/latest/USD" | jq --arg c "$UNIT_UPPER" '.rates[$c] // empty' 2>/dev/null)
       if [[ "$FETCHED_RATE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
         CONVERSION_RATE="$FETCHED_RATE"
       else
-        CONVERSION_RATE=150 # Fallback default
+        # Off-line fallbacks for common currencies
+        case "$UNIT_LOWER" in
+          jpy) CONVERSION_RATE=150 ;;
+          eur) CONVERSION_RATE=0.9 ;;
+          gbp) CONVERSION_RATE=0.8 ;;
+          *) CONVERSION_RATE=1 ;;
+        esac
       fi
       ;;
-    credits) CONVERSION_RATE=25 ;;
-    *) CONVERSION_RATE=1 ;;
   esac
 fi
 
@@ -306,40 +312,49 @@ if [[ ! "$TOTAL_TOKENS" =~ ^[0-9]+$ ]]; then
   TOTAL_TOKENS=0
 fi
 
-# Format values based on preference (USD, JPY, Credits, or custom unit)
-CALCULATED_VALUE=$(echo "$COST_USD * $CONVERSION_RATE" | bc -l)
+# Determine currency prefix symbol and suffix label based on unit
+PREFIX_SYMBOL=""
+SUFFIX_LABEL=""
+CREDIT_TITLE="Cost ($UNIT_UPPER)"
 
 case "$UNIT_LOWER" in
-  usd)
-    FORMATTED_VALUE=$(printf "%.2f" "$CALCULATED_VALUE" 2>/dev/null || printf "0.00")
-    METRICS_BAR_VALUE="\$${FORMATTED_VALUE}"
-    JSON_FORMATTED_VALUE="\$${FORMATTED_VALUE}"
-    CREDIT_TITLE="Cost (USD)"
+  usd|cad|aud|sgd|nzd|hkd|mxn|cop)
+    PREFIX_SYMBOL="$"
     ;;
-  jpy)
-    FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
-    METRICS_BAR_VALUE="¥${FORMATTED_VALUE}"
-    JSON_FORMATTED_VALUE="¥${FORMATTED_VALUE}"
-    CREDIT_TITLE="Cost (JPY)"
+  jpy|cny)
+    PREFIX_SYMBOL="¥"
+    ;;
+  eur)
+    PREFIX_SYMBOL="€"
+    ;;
+  gbp)
+    PREFIX_SYMBOL="£"
     ;;
   credits)
-    FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
-    METRICS_BAR_VALUE="${FORMATTED_VALUE} cʀ"
-    JSON_FORMATTED_VALUE="${FORMATTED_VALUE}"
+    SUFFIX_LABEL=" cʀ"
     CREDIT_TITLE="Credits"
     ;;
   *)
-    # Custom Unit
-    if [ "$CONVERSION_RATE" = "1" ] || [ "$CONVERSION_RATE" = "1.0" ]; then
-      FORMATTED_VALUE=$(printf "%.2f" "$CALCULATED_VALUE" 2>/dev/null || printf "0.00")
-    else
-      FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
-    fi
-    METRICS_BAR_VALUE="${FORMATTED_VALUE} ${UNIT}"
-    JSON_FORMATTED_VALUE="${FORMATTED_VALUE}"
+    SUFFIX_LABEL=" ${UNIT}"
     CREDIT_TITLE="${UNIT}"
     ;;
 esac
+
+# Calculate converted value
+CALCULATED_VALUE=$(echo "$COST_USD * $CONVERSION_RATE" | bc -l)
+
+# Format decimal places: standard currencies except JPY/CNY/credits get 2 decimals
+case "$UNIT_LOWER" in
+  jpy|cny|credits)
+    FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
+    ;;
+  *)
+    FORMATTED_VALUE=$(printf "%.2f" "$CALCULATED_VALUE" 2>/dev/null || printf "0.00")
+    ;;
+esac
+
+METRICS_BAR_VALUE="${PREFIX_SYMBOL}${FORMATTED_VALUE}${SUFFIX_LABEL}"
+JSON_FORMATTED_VALUE="${PREFIX_SYMBOL}${FORMATTED_VALUE}${SUFFIX_LABEL}"
 
 FORMATTED_TOKENS=$(printf "%d" "$TOTAL_TOKENS")
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
