@@ -223,12 +223,16 @@ case "$PERIOD_LOWER" in
     JSON_ARRAY_KEY="daily"
     DATE_FIELD_QUERY=".date // .period"
     PERIOD_LABEL="Daily"
+    START_DATE=$(date +%Y/%m/%d)
+    END_DATE=$(date +%Y/%m/%d)
     ;;
   weekly)
     CURRENT_DATE=$(date -v-sun +%Y-%m-%d)
     JSON_ARRAY_KEY="weekly"
     DATE_FIELD_QUERY=".week // .period"
     PERIOD_LABEL="Weekly"
+    START_DATE=$(date -v-sun +%Y/%m/%d)
+    END_DATE=$(date -v+sat +%Y/%m/%d)
     ;;
   monthly|*)
     PERIOD="monthly"
@@ -236,6 +240,8 @@ case "$PERIOD_LOWER" in
     JSON_ARRAY_KEY="monthly"
     DATE_FIELD_QUERY=".month // .period"
     PERIOD_LABEL="Monthly"
+    START_DATE=$(date -v1d +%Y/%m/%d)
+    END_DATE=$(date -v+1m -v1d -v-1d +%Y/%m/%d)
     ;;
 esac
 
@@ -395,8 +401,8 @@ export RUNCAT_LAST_UPDATED="$TIMESTAMP"
 export RUNCAT_CREDIT_TITLE="$CREDIT_TITLE"
 export RUNCAT_CREDIT_VAL="$JSON_FORMATTED_VALUE"
 export RUNCAT_TOKENS_VAL="$FORMATTED_TOKENS"
-export RUNCAT_PERIOD_TITLE="Period"
-export RUNCAT_PERIOD_VAL="${PERIOD_LABEL} (${CURRENT_DATE})"
+export RUNCAT_PERIOD_TITLE="${PERIOD_LABEL}"
+export RUNCAT_PERIOD_VAL="${START_DATE} - ${END_DATE}"
 
 # Generate RunCat Neo Custom Metrics JSON
 jq -n '
