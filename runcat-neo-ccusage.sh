@@ -103,6 +103,28 @@ show_status() {
   fi
 }
 
+# --- Number Formatting Helper ---
+format_large_number() {
+  local num="$1"
+  if [[ ! "$num" =~ ^[0-9]+$ ]] || [ "$num" -eq 0 ]; then
+    echo "0"
+    return
+  fi
+
+  if [ "$num" -ge 1000000000 ]; then
+    local val=$(echo "scale=2; $num / 1000000000" | bc -l)
+    printf "%.2fB" "$val"
+  elif [ "$num" -ge 1000000 ]; then
+    local val=$(echo "scale=2; $num / 1000000" | bc -l)
+    printf "%.2fM" "$val"
+  elif [ "$num" -ge 1000 ]; then
+    local val=$(echo "scale=2; $num / 1000" | bc -l)
+    printf "%.2fK" "$val"
+  else
+    echo "$num"
+  fi
+}
+
 # --- Help Message ---
 show_help() {
   echo "RunCat Neo Custom Metrics Updater for ccusage"
@@ -390,7 +412,7 @@ esac
 METRICS_BAR_VALUE="${PREFIX_SYMBOL}${FORMATTED_VALUE}${SUFFIX_LABEL}"
 JSON_FORMATTED_VALUE="${PREFIX_SYMBOL}${FORMATTED_VALUE}${SUFFIX_LABEL}"
 
-FORMATTED_TOKENS=$(printf "%d" "$TOTAL_TOKENS")
+FORMATTED_TOKENS=$(format_large_number "$TOTAL_TOKENS")
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Export variables for jq
