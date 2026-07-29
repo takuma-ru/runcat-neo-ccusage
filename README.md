@@ -62,8 +62,8 @@ To remove the cron job:
   -a, --agent <name>    Agent to track (claude, codex, gemini, copilot, or all) [default: all]
   -t, --title <title>    Custom card title in RunCat Neo
   -s, --symbol <symbol>  Custom SF Symbol identifier (macOS)
-  -r, --rate <rate>      Credit conversion rate (1 USD = X Credits) [default: 25]
-  -c, --credits          Display metrics as credits instead of USD
+  -U, --unit <unit>      Unit/currency to display (USD, JPY, credits, or custom text)
+  -r, --rate <rate>      Conversion rate from USD (default: 25 for credits, 150 for JPY, 1 for others)
   -i, --install          Install configuration to crontab (runs every 10 minutes)
   -u, --uninstall        Remove configuration from crontab
   -h, --help             Show this help message

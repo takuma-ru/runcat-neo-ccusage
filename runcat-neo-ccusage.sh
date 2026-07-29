@@ -12,8 +12,9 @@ export LC_NUMERIC="en_US.UTF-8"
 AGENT="all"
 TITLE=""
 SYMBOL=""
-CREDIT_RATE=25
-USE_CREDITS=""
+CONVERSION_RATE=""
+EXPLICIT_RATE=false
+UNIT=""
 INSTALL=false
 UNINSTALL=false
 STATUS=false
@@ -111,8 +112,8 @@ show_help() {
   echo "  -a, --agent <name>    Agent to track (e.g., claude, codex, gemini, copilot, or all) [default: all]"
   echo "  -t, --title <title>    Custom card title displayed in RunCat Neo"
   echo "  -s, --symbol <symbol>  Custom SF Symbol identifier (macOS)"
-  echo "  -r, --rate <rate>      Credit conversion rate (1 USD = X Credits) [default: 25]"
-  echo "  -c, --credits          Display metrics as credits instead of USD"
+  echo "  -U, --unit <unit>      Unit/currency to display (e.g., USD, JPY, credits, or custom text)"
+  echo "  -r, --rate <rate>      Conversion rate from USD (default: 25 for credits, 150 for JPY, 1 for others)"
   echo "  -i, --install          Install this configuration to crontab (runs every 10 minutes)"
   echo "  -u, --uninstall        Remove this configuration from crontab"
   echo "  status, --status       Show the status of active cron jobs and metrics files"
@@ -122,8 +123,8 @@ show_help() {
   echo "  # Track global monthly usage (All Agents) in USD"
   echo "  $(basename "$0") --agent all"
   echo ""
-  echo "  # Track Claude monthly usage with a custom title and symbol"
-  echo "  $(basename "$0") --agent claude --title \"Claude Code\" --symbol \"sparkles\""
+  echo "  # Track Claude monthly usage in JPY with a conversion rate of 150"
+  echo "  $(basename "$0") --agent claude --unit JPY --rate 150"
   echo ""
   echo "  # Track Codex monthly usage converted to credits (default behavior for codex)"
   echo "  $(basename "$0") --agent codex"
@@ -141,8 +142,8 @@ while [[ "$#" -gt 0 ]]; do
     -a|--agent) AGENT="$2"; shift ;;
     -t|--title) TITLE="$2"; shift ;;
     -s|--symbol) SYMBOL="$2"; shift ;;
-    -r|--rate) CREDIT_RATE="$2"; shift ;;
-    -c|--credits) USE_CREDITS="true" ;;
+    -r|--rate) CONVERSION_RATE="$2"; EXPLICIT_RATE=true; shift ;;
+    -U|--unit) UNIT="$2"; shift ;;
     -i|--install) INSTALL=true ;;
     -u|--uninstall) UNINSTALL=true ;;
     status|--status) STATUS=true ;;
@@ -175,13 +176,25 @@ if [ -z "$SYMBOL" ]; then
   esac
 fi
 
-# Automatically enable credits conversion for Codex by default unless explicitly specified
-if [ -z "$USE_CREDITS" ]; then
+# Determine Default Unit based on agent if not specified
+if [ -z "$UNIT" ]; then
   if [ "$AGENT" = "codex" ]; then
-    USE_CREDITS="true"
+    UNIT="credits"
   else
-    USE_CREDITS="false"
+    UNIT="USD"
   fi
+fi
+
+UNIT_LOWER=$(echo "$UNIT" | tr '[:upper:]' '[:lower:]')
+
+# Determine Default Rate if not explicitly provided
+if [ "$EXPLICIT_RATE" = false ]; then
+  case "$UNIT_LOWER" in
+    usd) CONVERSION_RATE=1 ;;
+    jpy) CONVERSION_RATE=150 ;; # Default USD to JPY rate
+    credits) CONVERSION_RATE=25 ;;
+    *) CONVERSION_RATE=1 ;;
+  esac
 fi
 
 # --- File System Configuration ---
@@ -201,15 +214,9 @@ fi
 if [ "$SYMBOL" != "brain.headpoint.filled" ] && [ "$SYMBOL" != "asterisk.circle" ] && [ "$SYMBOL" != "seal" ] && [ "$SYMBOL" != "sparkles" ] && [ "$SYMBOL" != "cat" ]; then
   EXEC_CMD="$EXEC_CMD --symbol \"$SYMBOL\""
 fi
-if [ "$USE_CREDITS" = "true" ] && [ "$AGENT" != "codex" ]; then
-  EXEC_CMD="$EXEC_CMD --credits"
-fi
-if [ "$USE_CREDITS" = "false" ] && [ "$AGENT" = "codex" ]; then
-  # If credits turned off for Codex, make sure to pass it
-  EXEC_CMD="$EXEC_CMD" # Not strictly required as we can specify in help
-fi
-if [ "$CREDIT_RATE" != "25" ]; then
-  EXEC_CMD="$EXEC_CMD --rate $CREDIT_RATE"
+EXEC_CMD="$EXEC_CMD --unit \"$UNIT\""
+if [ "$EXPLICIT_RATE" = true ]; then
+  EXEC_CMD="$EXEC_CMD --rate $CONVERSION_RATE"
 fi
 
 CRON_LINE="*/10 * * * * $EXEC_CMD > /dev/null 2>&1"
@@ -291,19 +298,40 @@ if [[ ! "$TOTAL_TOKENS" =~ ^[0-9]+$ ]]; then
   TOTAL_TOKENS=0
 fi
 
-# Format values based on preference
-if [ "$USE_CREDITS" = "true" ]; then
-  TOTAL_CREDITS=$(echo "$COST_USD * $CREDIT_RATE" | bc -l)
-  FORMATTED_VALUE="$(printf "%.0f" "$TOTAL_CREDITS" 2>/dev/null || printf "0")"
-  METRICS_BAR_VALUE="${FORMATTED_VALUE} cʀ"
-  CREDIT_TITLE="Credits"
-  JSON_FORMATTED_VALUE="$FORMATTED_VALUE"
-else
-  FORMATTED_VALUE="$(printf "%.2f" "$COST_USD" 2>/dev/null || printf "0.00")"
-  METRICS_BAR_VALUE="\$${FORMATTED_VALUE}"
-  CREDIT_TITLE="Cost"
-  JSON_FORMATTED_VALUE="\$${FORMATTED_VALUE}"
-fi
+# Format values based on preference (USD, JPY, Credits, or custom unit)
+CALCULATED_VALUE=$(echo "$COST_USD * $CONVERSION_RATE" | bc -l)
+
+case "$UNIT_LOWER" in
+  usd)
+    FORMATTED_VALUE=$(printf "%.2f" "$CALCULATED_VALUE" 2>/dev/null || printf "0.00")
+    METRICS_BAR_VALUE="\$${FORMATTED_VALUE}"
+    JSON_FORMATTED_VALUE="\$${FORMATTED_VALUE}"
+    CREDIT_TITLE="Cost (USD)"
+    ;;
+  jpy)
+    FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
+    METRICS_BAR_VALUE="¥${FORMATTED_VALUE}"
+    JSON_FORMATTED_VALUE="¥${FORMATTED_VALUE}"
+    CREDIT_TITLE="Cost (JPY)"
+    ;;
+  credits)
+    FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
+    METRICS_BAR_VALUE="${FORMATTED_VALUE} cʀ"
+    JSON_FORMATTED_VALUE="${FORMATTED_VALUE}"
+    CREDIT_TITLE="Credits"
+    ;;
+  *)
+    # Custom Unit
+    if [ "$CONVERSION_RATE" = "1" ] || [ "$CONVERSION_RATE" = "1.0" ]; then
+      FORMATTED_VALUE=$(printf "%.2f" "$CALCULATED_VALUE" 2>/dev/null || printf "0.00")
+    else
+      FORMATTED_VALUE=$(printf "%.0f" "$CALCULATED_VALUE" 2>/dev/null || printf "0")
+    fi
+    METRICS_BAR_VALUE="${FORMATTED_VALUE} ${UNIT}"
+    JSON_FORMATTED_VALUE="${FORMATTED_VALUE}"
+    CREDIT_TITLE="${UNIT}"
+    ;;
+esac
 
 FORMATTED_TOKENS=$(printf "%d" "$TOTAL_TOKENS")
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
