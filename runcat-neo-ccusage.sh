@@ -371,7 +371,7 @@ fi
 # Determine currency prefix symbol and suffix label based on unit
 PREFIX_SYMBOL=""
 SUFFIX_LABEL=""
-CREDIT_TITLE="Cost ($UNIT_UPPER)"
+CREDIT_TITLE="Cost"
 
 case "$UNIT_LOWER" in
   usd|cad|aud|sgd|nzd|hkd|mxn|cop)
