@@ -388,11 +388,9 @@ case "$UNIT_LOWER" in
     ;;
   credits)
     SUFFIX_LABEL=" cʀ"
-    CREDIT_TITLE="Credits"
     ;;
   *)
     SUFFIX_LABEL=" ${UNIT}"
-    CREDIT_TITLE="${UNIT}"
     ;;
 esac
 
