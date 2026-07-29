@@ -1,108 +1,71 @@
-# RunCat Neo Custom Metrics for ccusage 🐾
+# runcat-neo-ccusage
 
-This is a highly flexible, robust, and generic shell script that bridges **[ccusage](https://github.com/mscouter/ccusage)** (the AI Agent CLI token/cost usage tracker) and **[RunCat Neo](https://github.com/kyome/RunCat-Neo)** (the next-generation open-source macOS status bar monitor).
+runcat-neo-ccusage is a shell script that formats monthly token and cost metrics from [ccusage](https://github.com/mscouter/ccusage) into the custom JSON schema required by [RunCat Neo](https://github.com/kyome/RunCat-Neo).
 
-It queries monthly tokens and cost usage for your various AI coding agents (Claude, Codex, Gemini, Copilot, etc.), formats them to the exact JSON schema required by RunCat Neo, and automates updates using a macOS cron job.
+## Prerequisites
 
----
+- macOS
+- RunCat Neo (with Metrics Bar enabled)
+- ccusage
+- jq
 
-## ✨ Features
+## Installation
 
-- **Multi-Agent Support:** Track global usage (`all`), or target specific agents like `claude`, `codex`, `gemini`, or `copilot`.
-- **Smart Defaults:** Automatically maps each agent to its corresponding title, macOS SF Symbol, and conversion type (USD or Credits).
-- **Credits Conversion:** Automatically converts cost in USD to Credits (e.g., `1 USD = 25 Credits` for Codex).
-- **Calendar-Month Alignment:** Robust date validation ensures costs automatically reset to zero at the beginning of a new month, preventing outdated data from lingering before your first prompt of the month.
-- **Easy Installer:** Includes full self-contained options (`--install` / `--uninstall`) to easily manage multiple independent agent tasks inside your `crontab` without manual editing.
-
----
-
-## 🛠 Prerequisites
-
-Before starting, ensure you have the following installed on your Mac:
-
-1. **[RunCat Neo](https://github.com/kyome/RunCat-Neo)** (Make sure the **Metrics Bar** feature is enabled).
-2. **ccusage**: The command-line utility to monitor your AI CLI costs (`npm install -g ccusage` or similar).
-3. **jq**: High-performance JSON parser (`brew install jq`).
-
----
-
-## 🚀 Getting Started
-
-### 1. Download & Prepare the Script
-
-Save the `runcat-neo-ccusage.sh` script to your preferred location (e.g., `~/.config/run-cat-neo/`), then make it executable:
+Save `runcat-neo-ccusage.sh` locally and make it executable:
 
 ```bash
-mkdir -p ~/.config/run-cat-neo
-cd ~/.config/run-cat-neo
-# Save runcat-neo-ccusage.sh here
 chmod +x runcat-neo-ccusage.sh
 ```
 
-### 2. Run / Test the Script
+## Usage
 
-You can run the script manually to generate the metrics JSON files:
+Run the script manually to generate the metrics JSON file:
 
 ```bash
-# Global AI Agent usage (USD)
+# Track all agents (USD)
 ./runcat-neo-ccusage.sh --agent all
 
-# Claude usage (USD, custom sparkles symbol)
-./runcat-neo-ccusage.sh --agent claude --symbol "sparkles"
+# Track Claude (USD)
+./runcat-neo-ccusage.sh --agent claude
 
-# Codex usage (automatically converts to credits)
+# Track Codex (Credits)
 ./runcat-neo-ccusage.sh --agent codex
 ```
 
-This will generate files like `runcat_claude_metrics.json` inside your `~/.config/run-cat-neo/` directory.
+### Automation (crontab)
 
-### 3. Automate with Cron (Auto-Install)
-
-Simply pass the `--install` / `-i` flag to register the script as a background cron job running every 10 minutes. You can install multiple agents completely independently!
+You can register the script to your crontab using the `--install` flag:
 
 ```bash
-# Install Claude tracking
 ./runcat-neo-ccusage.sh --agent claude --install
-
-# Install Codex tracking as Credits
-./runcat-neo-ccusage.sh --agent codex --install
 ```
 
-To remove a background tracking task, run:
+To remove the cron job:
+
 ```bash
 ./runcat-neo-ccusage.sh --agent claude --uninstall
 ```
 
----
+## RunCat Neo Configuration
 
-## 🎨 Setting Up RunCat Neo
+1. Open RunCat Neo Settings.
+2. Navigate to **Metrics** > **Custom Metrics** and click **Add Custom Metrics Source**.
+3. Select the generated JSON file (e.g., `~/.config/run-cat-neo/runcat_claude_metrics.json`).
+4. Enable the **Metrics Bar** and toggle the custom metric source to On.
 
-1. Right-click the running cat in your menu bar and open **Settings (Preferences)**.
-2. Go to **Metrics** > **Custom Metrics**.
-3. Click **Add Custom Metrics Source**.
-4. Choose the JSON file created by the script (e.g., `~/.config/run-cat-neo/runcat_claude_metrics.json`).
-   * *Tip:* Since `.config` is a hidden directory, press `Cmd + Shift + .` in the file picker dialog to show hidden files, or press `Cmd + Shift + G` and paste the path: `~/.config/run-cat-neo`.
-5. Enable **Metrics Bar** in the Settings.
-6. Click on the Metrics Bar in your macOS menu bar, and toggle your new custom source to **On**.
-
----
-
-## ⚙️ Options Reference
+## Options
 
 ```text
-Options:
-  -a, --agent <name>    Agent to track (e.g., claude, codex, gemini, copilot, or all) [default: all]
-  -t, --title <title>    Custom card title displayed in RunCat Neo
+  -a, --agent <name>    Agent to track (claude, codex, gemini, copilot, or all) [default: all]
+  -t, --title <title>    Custom card title in RunCat Neo
   -s, --symbol <symbol>  Custom SF Symbol identifier (macOS)
   -r, --rate <rate>      Credit conversion rate (1 USD = X Credits) [default: 25]
   -c, --credits          Display metrics as credits instead of USD
-  -i, --install          Install this configuration to crontab (runs every 10 minutes)
-  -u, --uninstall        Remove this configuration from crontab
+  -i, --install          Install configuration to crontab (runs every 10 minutes)
+  -u, --uninstall        Remove configuration from crontab
   -h, --help             Show this help message
 ```
 
----
-
-## 📄 License
+## License
 
 MPL 2.0
