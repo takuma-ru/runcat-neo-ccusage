@@ -92,7 +92,7 @@ show_status() {
       jq -c '.metrics[]?' "$f" 2>/dev/null | while read -r metric; do
         local m_title=$(echo "$metric" | jq -r '.title // ""' 2>/dev/null)
         local m_val=$(echo "$metric" | jq -r '.formattedValue // ""' 2>/dev/null)
-        echo "      * $m_title: $m_val"
+        echo "      * $m_title : $m_val"
       done
       echo ""
     fi
