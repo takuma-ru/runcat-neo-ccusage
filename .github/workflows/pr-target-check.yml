@@ -1,0 +1,62 @@
+name: PR Target Validator
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-branch:
+    name: Validate Base and Head Branches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR Flow and Release Labels
+        run: |
+          # 1. Check branch flow relationship
+          HEAD_BRANCH="${{ github.head_ref }}"
+          echo "PR Source Branch: $HEAD_BRANCH"
+          echo "PR Target Branch: main"
+
+          if [ "$HEAD_BRANCH" = "develop" ] || [[ "$HEAD_BRANCH" =~ ^hotfix/ ]]; then
+            echo "✓ Valid branch flow: $HEAD_BRANCH -> main"
+          else
+            echo "❌ Error: Merges to main are ONLY allowed from 'develop' or 'hotfix/*' branches!" >&2
+            echo "Please close this PR and merge your changes into 'develop' first, or rename your branch." >&2
+            exit 1
+          fi
+
+          echo "=========================================="
+
+          # 2. Check Release Labels from GITHUB_EVENT_PATH
+          LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+          echo "PR Labels found:"
+          echo "$LABELS"
+
+          PATCH_COUNT=$(echo "$LABELS" | grep -F -c "release:patch" || true)
+          MINOR_COUNT=$(echo "$LABELS" | grep -F -c "release:minor" || true)
+          MAJOR_COUNT=$(echo "$LABELS" | grep -F -c "release:major" || true)
+
+          TOTAL_RELEASE_LABELS=$((PATCH_COUNT + MINOR_COUNT + MAJOR_COUNT))
+
+          if [ "$TOTAL_RELEASE_LABELS" -eq 1 ]; then
+            if [ "$PATCH_COUNT" -eq 1 ]; then
+              echo "✓ Valid release label found: release:patch"
+            elif [ "$MINOR_COUNT" -eq 1 ]; then
+              echo "✓ Valid release label found: release:minor"
+            else
+              echo "✓ Valid release label found: release:major"
+            fi
+            exit 0
+          else
+            if [ "$TOTAL_RELEASE_LABELS" -eq 0 ]; then
+              echo "❌ Error: PR must have EXACTLY ONE release label to merge into main!" >&2
+              echo "Please apply one of the following labels to your PR:" >&2
+              echo "  - release:patch" >&2
+              echo "  - release:minor" >&2
+              echo "  - release:major" >&2
+            else
+              echo "❌ Error: Multiple release labels found! You must apply EXACTLY ONE label." >&2
+              echo "Current matching labels count: $TOTAL_RELEASE_LABELS" >&2
+            fi
+            exit 1
+          fi

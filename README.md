@@ -1,72 +1,92 @@
 # runcat-neo-ccusage
 
-runcat-neo-ccusage is a shell script that formats monthly token and cost metrics from [ccusage](https://github.com/mscouter/ccusage) into the custom JSON schema required by [RunCat Neo](https://github.com/kyome/RunCat-Neo).
+Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage) into [RunCat Neo](https://github.com/runcat-dev/RunCatNeo)'s custom JSON schema.
+
+## Features
+
+- **Zero Runtime Dependencies:** The compiled single-binary has zero dependency on `jq`, `bc`, or custom shell date utilities.
+- **Multi-Currency & Conversion:** Supports `USD`, `JPY` (with live dynamic exchange rate fetching and offline fallback), `EUR`, `GBP`, `credits` (default for Codex), or any custom unit.
+- **Flexible Ranges:** Track monthly, weekly, daily, or custom billing cycles with `--period-since` and `--period-until`.
+- **Diagnostic Dashboard:** Run `rn-ccusage status` to view active cron jobs, tool status, and generated JSON values.
 
 ## Prerequisites
 
+To run this utility, you only need:
 - macOS
 - RunCat Neo (with Metrics Bar enabled)
-- ccusage
-- jq
+- [ccusage](https://github.com/ccusage/ccusage) installed
 
-## Installation
+## Getting Started
 
-Save `runcat-neo-ccusage.sh` locally and make it executable:
+### 1. Install rn-ccusage
 
-```bash
-chmod +x runcat-neo-ccusage.sh
-```
-
-## Usage
-
-Run the script manually to generate the metrics JSON file:
+Download and extract the pre-compiled universal binary, then move it to your system `PATH` (e.g., `~/.local/bin/` or `/usr/local/bin/`):
 
 ```bash
-# Track all agents (USD)
-./runcat-neo-ccusage.sh --agent all
-
-# Track Claude (USD)
-./runcat-neo-ccusage.sh --agent claude
-
-# Track Codex (Credits)
-./runcat-neo-ccusage.sh --agent codex
-
-# Check system status, active cron jobs, and generated metrics
-./runcat-neo-ccusage.sh status
+curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/rn-ccusage-mac.tar.gz | tar -xz
+mv rn-ccusage ~/.local/bin/
 ```
 
-### Automation (crontab)
+### 2. Configure RunCat Neo
 
-You can register the script to your crontab using the `--install` flag:
+1. Open RunCat Neo **Settings** > **Metrics** > **Custom Metrics**.
+2. Click **Add Custom Metrics Source** and select the generated JSON file inside your central config directory:
+   `~/.config/rn-ccusage/runcat_claude_metrics.json`
+3. Enable **Metrics Bar** and toggle the new source to On.
+
+## Usage & Examples
+
+### Manual Execution
+Generate metrics JSON manually for your agents (outputted centrally under `~/.config/rn-ccusage/`):
 
 ```bash
-./runcat-neo-ccusage.sh --agent claude --install
+# Track global monthly usage (All Agents) in USD
+rn-ccusage --agent all
+
+# Track Claude weekly usage in JPY
+rn-ccusage --agent claude --period weekly --unit JPY
+
+# Track Codex monthly usage converted to credits (default for Codex)
+rn-ccusage --agent codex
+
+# Track a dynamic rolling billing cycle starting on the 25th of every month (e.g., 25th to 24th)
+rn-ccusage --agent claude --period-since 25th
+
+# Track a dynamic rolling period using macOS relative date offsets or epochs (e.g., "-v-mon" or "-r 1711111111")
+rn-ccusage --agent claude --period-since "-v-mon"
+
+# Query a specific historical date range (static)
+rn-ccusage --agent claude --period-since 20260625 --period-until 20260724
 ```
 
-To remove the cron job:
+### Automation & Diagnostics
+Install, uninstall, or view system status:
 
 ```bash
-./runcat-neo-ccusage.sh --agent claude --uninstall
+# Register background auto-update (runs every 10 minutes)
+rn-ccusage --agent claude --period weekly --unit JPY --install
+
+# Remove background auto-update for an agent
+rn-ccusage --agent claude --uninstall
+
+# Check status of active cron jobs and generated metrics
+rn-ccusage status
 ```
 
-## RunCat Neo Configuration
-
-1. Open RunCat Neo Settings.
-2. Navigate to **Metrics** > **Custom Metrics** and click **Add Custom Metrics Source**.
-3. Select the generated JSON file (e.g., `~/.config/run-cat-neo/runcat_claude_metrics.json`).
-4. Enable the **Metrics Bar** and toggle the custom metric source to On.
-
-## Options
+## Options Reference
 
 ```text
-  -a, --agent <name>    Agent to track (claude, codex, gemini, copilot, or all) [default: all]
-  -t, --title <title>    Custom card title in RunCat Neo
-  -s, --symbol <symbol>  Custom SF Symbol identifier (macOS)
-  -U, --unit <unit>      Unit/currency to display (USD, JPY, credits, or custom text)
-  -r, --rate <rate>      Conversion rate from USD (default: 25 for credits, 150 for JPY, 1 for others)
-  -i, --install          Install configuration to crontab (runs every 10 minutes)
-  -u, --uninstall        Remove configuration from crontab
-  -h, --help             Show this help message
+  -a, --agent <name>     Agent to track (claude, codex, gemini, copilot, or all) [default: all]
+  -t, --title <title>     Custom card title in RunCat Neo
+  -s, --symbol <symbol>   Custom SF Symbol identifier (macOS)
+  -p, --period <period>   Target retrieval period (monthly, weekly, or daily) [default: monthly]
+  --period-since <date>   Custom retrieval start date (YYYYMMDD or YYYY-MM-DD)
+  --period-until <date>   Custom retrieval end date (YYYYMMDD or YYYY-MM-DD)
+  -U, --unit <unit>       Unit/currency to display (USD, JPY, credits, or custom text)
+  -r, --rate <rate>       Conversion rate from USD (default: 25 for credits, 150 for JPY, 1 for others)
+  -i, --install           Install configuration to crontab (runs every 10 minutes)
+  -u, --uninstall         Remove configuration from crontab
+  -h, --help              Show this help message
 ```
 
 ## License
