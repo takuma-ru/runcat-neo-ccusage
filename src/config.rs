@@ -80,7 +80,8 @@ pub fn parse_args(args: Vec<String>) -> Result<Config, String> {
             }
             "-r" | "--rate" => {
                 if i + 1 < args.len() {
-                    let rate_val: f64 = args[i + 1].parse()
+                    let rate_val: f64 = args[i + 1]
+                        .parse()
                         .map_err(|_| "Invalid number for --rate".to_string())?;
                     conversion_rate = Some(rate_val);
                     i += 2;
@@ -189,9 +190,9 @@ mod tests {
         assert_eq!(config.period, "monthly");
         assert_eq!(config.unit, "USD");
         assert_eq!(config.conversion_rate, Some(1.0));
-        assert_eq!(config.install, false);
-        assert_eq!(config.uninstall, false);
-        assert_eq!(config.status, false);
+        assert!(!config.install);
+        assert!(!config.uninstall);
+        assert!(!config.status);
     }
 
     #[test]
@@ -253,21 +254,21 @@ mod tests {
     fn test_parse_status() {
         let args = vec!["binary_path".to_string(), "status".to_string()];
         let config = parse_args(args).unwrap();
-        assert_eq!(config.status, true);
+        assert!(config.status);
 
         let args_long = vec!["binary_path".to_string(), "--status".to_string()];
         let config_long = parse_args(args_long).unwrap();
-        assert_eq!(config_long.status, true);
+        assert!(config_long.status);
     }
 
     #[test]
     fn test_parse_install_uninstall() {
         let args_inst = vec!["binary_path".to_string(), "--install".to_string()];
         let config_inst = parse_args(args_inst).unwrap();
-        assert_eq!(config_inst.install, true);
+        assert!(config_inst.install);
 
         let args_uninst = vec!["binary_path".to_string(), "-u".to_string()];
         let config_uninst = parse_args(args_uninst).unwrap();
-        assert_eq!(config_uninst.uninstall, true);
+        assert!(config_uninst.uninstall);
     }
 }

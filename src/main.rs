@@ -4,9 +4,9 @@ pub mod formatting;
 pub mod parser;
 pub mod period;
 
+use chrono::Local;
 use std::io::Write;
 use std::process::exit;
-use chrono::Local;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -29,11 +29,17 @@ fn main() {
     let script_path = exe_path.to_string_lossy().to_string();
 
     let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/Users/kanekotakuma".to_string());
-    let output_dir = std::path::PathBuf::from(home_dir).join(".config").join("rn-ccusage");
+    let output_dir = std::path::PathBuf::from(home_dir)
+        .join(".config")
+        .join("rn-ccusage");
 
     // Ensure output directory exists
     if let Err(e) = std::fs::create_dir_all(&output_dir) {
-        eprintln!("Error creating output directory '{}': {}", output_dir.display(), e);
+        eprintln!(
+            "Error creating output directory '{}': {}",
+            output_dir.display(),
+            e
+        );
         exit(1);
     }
 
@@ -49,13 +55,23 @@ fn main() {
     }
 
     if config.install {
-        install_cron(&script_path, &config, &config.period_since, &config.period_until);
+        install_cron(
+            &script_path,
+            &config,
+            &config.period_since,
+            &config.period_until,
+        );
         exit(0);
     }
 
     // 3. Regular Execution - Metrics Processing
     let today = Local::now().date_naive();
-    let period_config = match period::calculate_period(&config.period, &config.period_since, &config.period_until, today) {
+    let period_config = match period::calculate_period(
+        &config.period,
+        &config.period_since,
+        &config.period_until,
+        today,
+    ) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("Error calculating period: {}", e);
@@ -65,7 +81,8 @@ fn main() {
 
     // Determine exchange rate (fetch dynamically if JPY/currency without explicit rate)
     let mut rate = config.conversion_rate.unwrap_or(1.0);
-    if config.conversion_rate.is_none() || !config.install { // If not explicitly overridden via CLI
+    if config.conversion_rate.is_none() || !config.install {
+        // If not explicitly overridden via CLI
         let unit_lower = config.unit.to_lowercase();
         if unit_lower != "usd" && unit_lower != "credits" {
             // Attempt to fetch dynamically
@@ -84,14 +101,27 @@ fn main() {
     }
 
     // Run ccusage
-    let since = period_config.period_since_formatted.clone().unwrap_or_default();
-    let until = period_config.period_until_formatted.clone().unwrap_or_default();
+    let since = period_config
+        .period_since_formatted
+        .clone()
+        .unwrap_or_default();
+    let until = period_config
+        .period_until_formatted
+        .clone()
+        .unwrap_or_default();
 
     let ccusage_args = if period_config.is_custom {
         if config.agent == "all" {
             vec!["--since", &since, "--until", &until, "--json"]
         } else {
-            vec![&config.agent, "--since", &since, "--until", &until, "--json"]
+            vec![
+                &config.agent,
+                "--since",
+                &since,
+                "--until",
+                &until,
+                "--json",
+            ]
         }
     } else {
         if config.agent == "all" {
@@ -171,13 +201,23 @@ fn main() {
         exit(1);
     }
 
-    println!("Successfully updated {} {} metrics at {}", config.title, config.period, out_file_path.display());
+    println!(
+        "Successfully updated {} {} metrics at {}",
+        config.title,
+        config.period,
+        out_file_path.display()
+    );
 }
 
 fn fetch_live_rate(unit: &str) -> Option<f64> {
     let unit_upper = unit.to_uppercase();
     let output = std::process::Command::new("curl")
-        .args(&["-s", "--connect-timeout", "2", "https://open.er-api.com/v6/latest/USD"])
+        .args([
+            "-s",
+            "--connect-timeout",
+            "2",
+            "https://open.er-api.com/v6/latest/USD",
+        ])
         .output()
         .ok()?;
 
@@ -210,10 +250,22 @@ fn show_status(_script_path: &str, exe_dir: &std::path::Path) {
     println!();
 
     println!("[System Tools]");
-    let ccusage_ok = std::process::Command::new("which").arg("ccusage").output().is_ok();
-    let jq_ok = std::process::Command::new("which").arg("jq").output().is_ok();
-    println!("  - ccusage : {}", if ccusage_ok { "Installed" } else { "NOT FOUND" });
-    println!("  - jq      : {}", if jq_ok { "Installed" } else { "NOT FOUND" });
+    let ccusage_ok = std::process::Command::new("which")
+        .arg("ccusage")
+        .output()
+        .is_ok();
+    let jq_ok = std::process::Command::new("which")
+        .arg("jq")
+        .output()
+        .is_ok();
+    println!(
+        "  - ccusage : {}",
+        if ccusage_ok { "Installed" } else { "NOT FOUND" }
+    );
+    println!(
+        "  - jq      : {}",
+        if jq_ok { "Installed" } else { "NOT FOUND" }
+    );
     println!();
 
     println!("[Crontab Configurations]");
@@ -263,14 +315,36 @@ fn show_status(_script_path: &str, exe_dir: &std::path::Path) {
 
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                            println!("    Title        : {}", parsed.get("title").and_then(|v| v.as_str()).unwrap_or("N/A"));
-                            println!("    Symbol       : {}", parsed.get("symbol").and_then(|v| v.as_str()).unwrap_or("N/A"));
-                            println!("    Bar Value    : {}", parsed.get("metricsBarValue").and_then(|v| v.as_str()).unwrap_or("N/A"));
+                            println!(
+                                "    Title        : {}",
+                                parsed
+                                    .get("title")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("N/A")
+                            );
+                            println!(
+                                "    Symbol       : {}",
+                                parsed
+                                    .get("symbol")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("N/A")
+                            );
+                            println!(
+                                "    Bar Value    : {}",
+                                parsed
+                                    .get("metricsBarValue")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("N/A")
+                            );
                             println!("    Details      :");
-                            if let Some(metrics) = parsed.get("metrics").and_then(|m| m.as_array()) {
+                            if let Some(metrics) = parsed.get("metrics").and_then(|m| m.as_array())
+                            {
                                 for m in metrics {
                                     let t = m.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                                    let val = m.get("formattedValue").and_then(|v| v.as_str()).unwrap_or("");
+                                    let val = m
+                                        .get("formattedValue")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
                                     println!("      * {} : {}", t, val);
                                 }
                             }
@@ -323,7 +397,12 @@ fn uninstall_cron(_script_path: &str, agent: &str) {
     println!("Success: Uninstalled cron job for agent '{}'.", agent);
 }
 
-fn install_cron(script_path: &str, config: &config::Config, period_since: &Option<String>, period_until: &Option<String>) {
+fn install_cron(
+    script_path: &str,
+    config: &config::Config,
+    period_since: &Option<String>,
+    period_until: &Option<String>,
+) {
     uninstall_cron(script_path, &config.agent);
 
     let mut exec_cmd = format!("{} --agent {}", script_path, config.agent);

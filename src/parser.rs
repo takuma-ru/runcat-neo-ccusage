@@ -7,16 +7,18 @@ pub fn parse_json(
     date_field_query: &str,
     current_date_str: &str,
 ) -> Result<(f64, u64), String> {
-    let parsed: Value = serde_json::from_str(json_str)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let parsed: Value =
+        serde_json::from_str(json_str).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     if is_custom {
         if let Some(totals) = parsed.get("totals") {
-            let cost = totals.get("totalCost")
+            let cost = totals
+                .get("totalCost")
                 .or_else(|| totals.get("costUSD"))
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
-            let tokens = totals.get("totalTokens")
+            let tokens = totals
+                .get("totalTokens")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0);
             return Ok((cost, tokens));
@@ -26,17 +28,20 @@ pub fn parse_json(
 
     if let Some(array) = parsed.get(json_array_key).and_then(|a| a.as_array()) {
         if let Some(last_entry) = array.last() {
-            let last_date = last_entry.get(date_field_query)
+            let last_date = last_entry
+                .get(date_field_query)
                 .or_else(|| last_entry.get("period"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
 
             if last_date == current_date_str {
-                let cost = last_entry.get("totalCost")
+                let cost = last_entry
+                    .get("totalCost")
                     .or_else(|| last_entry.get("costUSD"))
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
-                let tokens = last_entry.get("totalTokens")
+                let tokens = last_entry
+                    .get("totalTokens")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
                 return Ok((cost, tokens));
