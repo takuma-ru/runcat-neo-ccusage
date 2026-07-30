@@ -436,6 +436,25 @@ fn uninstall_cron(_script_path: &str, agent: &str) {
     println!("Success: Uninstalled cron job for agent '{}'.", agent);
 }
 
+fn sanitize_shell_arg(val: &str) -> String {
+    val.chars()
+        .filter(|&c| {
+            c != '"'
+                && c != '\''
+                && c != ';'
+                && c != '$'
+                && c != '`'
+                && c != '&'
+                && c != '|'
+                && c != '\\'
+                && c != '<'
+                && c != '>'
+                && c != '\n'
+                && c != '\r'
+        })
+        .collect()
+}
+
 fn install_cron(
     script_path: &str,
     config: &config::Config,
@@ -444,7 +463,11 @@ fn install_cron(
 ) {
     uninstall_cron(script_path, &config.agent);
 
-    let mut exec_cmd = format!("{} --agent {}", script_path, config.agent);
+    let mut exec_cmd = format!(
+        "\"{}\" --agent {}",
+        script_path,
+        sanitize_shell_arg(&config.agent)
+    );
 
     let default_title = match config.agent.as_str() {
         "all" => "AI Usage",
@@ -455,7 +478,8 @@ fn install_cron(
         _ => "",
     };
     if !default_title.is_empty() && config.title != default_title {
-        exec_cmd.push_str(&format!(" --title \"{}\"", config.title));
+        let sanitized_title = sanitize_shell_arg(&config.title);
+        exec_cmd.push_str(&format!(" --title \"{}\"", sanitized_title));
     }
 
     let default_symbol = match config.agent.as_str() {
@@ -467,23 +491,28 @@ fn install_cron(
         _ => "chart.bar.horizontal.page.fill",
     };
     if config.symbol != default_symbol {
-        exec_cmd.push_str(&format!(" --symbol \"{}\"", config.symbol));
+        let sanitized_symbol = sanitize_shell_arg(&config.symbol);
+        exec_cmd.push_str(&format!(" --symbol \"{}\"", sanitized_symbol));
     }
 
-    exec_cmd.push_str(&format!(" --unit \"{}\"", config.unit));
+    let sanitized_unit = sanitize_shell_arg(&config.unit);
+    exec_cmd.push_str(&format!(" --unit \"{}\"", sanitized_unit));
 
     if let Some(rate) = config.conversion_rate {
         exec_cmd.push_str(&format!(" --rate {}", rate));
     }
 
     if let Some(since) = period_since {
-        exec_cmd.push_str(&format!(" --period-since {}", since));
+        let sanitized_since = sanitize_shell_arg(since);
+        exec_cmd.push_str(&format!(" --period-since {}", sanitized_since));
     }
     if let Some(until) = period_until {
-        exec_cmd.push_str(&format!(" --period-until {}", until));
+        let sanitized_until = sanitize_shell_arg(until);
+        exec_cmd.push_str(&format!(" --period-until {}", sanitized_until));
     }
     if period_since.is_none() && period_until.is_none() {
-        exec_cmd.push_str(&format!(" --period \"{}\"", config.period));
+        let sanitized_period = sanitize_shell_arg(&config.period);
+        exec_cmd.push_str(&format!(" --period \"{}\"", sanitized_period));
     }
 
     let cron_line = format!(
@@ -522,4 +551,16 @@ fn install_cron(
     child.wait().unwrap();
     println!("Success: Installed task to crontab:");
     println!("  {}", cron_line);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_shell_arg() {
+        let input = "AI Usage\"; rm -rf /; echo \"hello";
+        let output = sanitize_shell_arg(input);
+        assert_eq!(output, "AI Usage rm -rf / echo hello");
+    }
 }
