@@ -13,16 +13,60 @@ pub struct PeriodConfig {
     pub period_until_formatted: Option<String>,
 }
 
+fn resolve_macos_date(arg: &str) -> Option<String> {
+    let mut date_args = Vec::new();
+    for token in arg.split_whitespace() {
+        date_args.push(token.to_string());
+    }
+    date_args.push("+%Y%m%d".to_string());
+
+    let output = std::process::Command::new("date")
+        .args(&date_args)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let date_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if date_str.len() == 8 && date_str.chars().all(|c| c.is_ascii_digit()) {
+            return Some(date_str);
+        }
+    }
+    None
+}
+
 pub fn calculate_period(
     period: &str,
     since: &Option<String>,
     until: &Option<String>,
     today: NaiveDate,
 ) -> Result<PeriodConfig, String> {
-    // Check if since is a dynamic billing day (e.g., "25", "25th")
+    // 1. Resolve relative macOS date arguments first
+    let resolved_since = since.as_ref().and_then(|s| {
+        if s.starts_with("-v") {
+            resolve_macos_date(s)
+        } else {
+            None
+        }
+    });
+
+    let resolved_until = until.as_ref().and_then(|u| {
+        if u.starts_with("-v") {
+            resolve_macos_date(u)
+        } else {
+            None
+        }
+    });
+
+    let effective_since = resolved_since.as_ref().or(since.as_ref().filter(|s| !s.starts_with("-v")));
+    let effective_until = resolved_until.as_ref().or(until.as_ref().filter(|u| !u.starts_with("-v")));
+
+    let since_opt = effective_since.cloned();
+    let until_opt = effective_until.cloned();
+
+    // 2. Check if since is a dynamic billing day (e.g., "25", "25th")
     let mut is_dynamic_day = false;
     let mut billing_day = 1;
-    if let Some(ref s) = since {
+    if let Some(ref s) = since_opt {
         let cleaned_s = s.trim().to_lowercase()
             .replace("th", "")
             .replace("st", "")
@@ -74,12 +118,12 @@ pub fn calculate_period(
         });
     }
 
-    if since.is_some() || until.is_some() {
-        let since_str = since.clone().unwrap_or_else(|| {
+    if since_opt.is_some() || until_opt.is_some() {
+        let since_str = since_opt.clone().unwrap_or_else(|| {
             let prev_month = today - Duration::days(30);
             prev_month.format("%Y%m%d").to_string()
         });
-        let until_str = until.clone().unwrap_or_else(|| {
+        let until_str = until_opt.clone().unwrap_or_else(|| {
             today.format("%Y%m%d").to_string()
         });
 
@@ -259,5 +303,16 @@ mod tests {
         assert_eq!(config.is_custom, true);
         assert_eq!(config.period_since_formatted, Some("20260625".to_string()));
         assert_eq!(config.period_until_formatted, Some("20260724".to_string()));
+    }
+
+    #[test]
+    fn test_calculate_macos_relative_date_monday() {
+        let today = NaiveDate::from_ymd_opt(2026, 7, 29).unwrap(); // Wednesday
+        let since = Some("-v-mon".to_string());
+        let config = calculate_period("monthly", &since, &None, today).unwrap();
+        assert_eq!(config.period_label, "Custom");
+        assert_eq!(config.start_date_str, "2026/07/27"); // Prev Monday
+        assert_eq!(config.is_custom, true);
+        assert_eq!(config.period_since_formatted, Some("20260727".to_string()));
     }
 }
