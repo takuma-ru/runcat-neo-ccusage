@@ -52,7 +52,7 @@ rn-ccusage --agent codex
 # Track a dynamic rolling billing cycle starting on the 25th of every month (e.g., 25th to 24th)
 rn-ccusage --agent claude --period-since 25th
 
-# Track a dynamic rolling period using macOS relative date offsets (e.g., from previous Monday to today)
+# Track a dynamic rolling period using macOS relative date offsets or epochs (e.g., "-v-mon" or "-r 1711111111")
 rn-ccusage --agent claude --period-since "-v-mon"
 
 # Track a specific static date range (e.g., from June 25 to July 24)
