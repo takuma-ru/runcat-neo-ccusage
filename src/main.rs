@@ -84,8 +84,8 @@ fn main() {
     }
 
     // Run ccusage
-    let since = config.period_since.clone().unwrap_or_default();
-    let until = config.period_until.clone().unwrap_or_default();
+    let since = period_config.period_since_formatted.clone().unwrap_or_default();
+    let until = period_config.period_until_formatted.clone().unwrap_or_default();
 
     let ccusage_args = if period_config.is_custom {
         if config.agent == "all" {

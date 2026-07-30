@@ -9,6 +9,8 @@ pub struct PeriodConfig {
     pub end_date_str: String,
     pub period_label: String,
     pub is_custom: bool,
+    pub period_since_formatted: Option<String>,
+    pub period_until_formatted: Option<String>,
 }
 
 pub fn calculate_period(
@@ -17,6 +19,61 @@ pub fn calculate_period(
     until: &Option<String>,
     today: NaiveDate,
 ) -> Result<PeriodConfig, String> {
+    // Check if since is a dynamic billing day (e.g., "25", "25th")
+    let mut is_dynamic_day = false;
+    let mut billing_day = 1;
+    if let Some(ref s) = since {
+        let cleaned_s = s.trim().to_lowercase()
+            .replace("th", "")
+            .replace("st", "")
+            .replace("nd", "")
+            .replace("rd", "");
+        if let Ok(day) = cleaned_s.parse::<u32>() {
+            if day >= 1 && day <= 31 {
+                is_dynamic_day = true;
+                billing_day = day;
+            }
+        }
+    }
+
+    if is_dynamic_day {
+        let (start_date, end_date) = if today.day() >= billing_day {
+            let start = NaiveDate::from_ymd_opt(today.year(), today.month(), billing_day).unwrap();
+            let next_month = if today.month() == 12 { 1 } else { today.month() + 1 };
+            let next_year = if today.month() == 12 { today.year() + 1 } else { today.year() };
+            let end = if billing_day == 1 {
+                let next_month_first = NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap();
+                next_month_first.pred_opt().unwrap()
+            } else {
+                NaiveDate::from_ymd_opt(next_year, next_month, billing_day - 1).unwrap()
+            };
+            (start, end)
+        } else {
+            let prev_month = if today.month() == 1 { 12 } else { today.month() - 1 };
+            let prev_year = if today.month() == 1 { today.year() - 1 } else { today.year() };
+            let start = NaiveDate::from_ymd_opt(prev_year, prev_month, billing_day).unwrap();
+            let end = if billing_day == 1 {
+                let current_month_first = NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap();
+                current_month_first.pred_opt().unwrap()
+            } else {
+                NaiveDate::from_ymd_opt(today.year(), today.month(), billing_day - 1).unwrap()
+            };
+            (start, end)
+        };
+
+        return Ok(PeriodConfig {
+            current_date_str: "".to_string(),
+            json_array_key: "".to_string(),
+            date_field_query: "".to_string(),
+            start_date_str: start_date.format("%Y/%m/%d").to_string(),
+            end_date_str: end_date.format("%Y/%m/%d").to_string(),
+            period_label: "Custom".to_string(),
+            is_custom: true,
+            period_since_formatted: Some(start_date.format("%Y%m%d").to_string()),
+            period_until_formatted: Some(end_date.format("%Y%m%d").to_string()),
+        });
+    }
+
     if since.is_some() || until.is_some() {
         let since_str = since.clone().unwrap_or_else(|| {
             let prev_month = today - Duration::days(30);
@@ -48,6 +105,8 @@ pub fn calculate_period(
             end_date_str,
             period_label: "Custom".to_string(),
             is_custom: true,
+            period_since_formatted: Some(start_cleaned),
+            period_until_formatted: Some(end_cleaned),
         });
     }
 
@@ -64,6 +123,8 @@ pub fn calculate_period(
                 end_date_str: display_str,
                 period_label: "Daily".to_string(),
                 is_custom: false,
+                period_since_formatted: None,
+                period_until_formatted: None,
             })
         }
         "weekly" => {
@@ -79,6 +140,8 @@ pub fn calculate_period(
                 end_date_str: end.format("%Y/%m/%d").to_string(),
                 period_label: "Weekly".to_string(),
                 is_custom: false,
+                period_since_formatted: None,
+                period_until_formatted: None,
             })
         }
         _ => {
@@ -96,6 +159,8 @@ pub fn calculate_period(
                 end_date_str: end.format("%Y/%m/%d").to_string(),
                 period_label: "Monthly".to_string(),
                 is_custom: false,
+                period_since_formatted: None,
+                period_until_formatted: None,
             })
         }
     }
@@ -154,6 +219,8 @@ mod tests {
         assert_eq!(config.start_date_str, "2026/07/20");
         assert_eq!(config.end_date_str, "2026/07/27");
         assert_eq!(config.is_custom, true);
+        assert_eq!(config.period_since_formatted, Some("20260720".to_string()));
+        assert_eq!(config.period_until_formatted, Some("20260727".to_string()));
     }
 
     #[test]
@@ -166,5 +233,31 @@ mod tests {
         assert_eq!(config.start_date_str, "2026/07/20");
         assert_eq!(config.end_date_str, "2026/07/27");
         assert_eq!(config.is_custom, true);
+    }
+
+    #[test]
+    fn test_calculate_dynamic_billing_cycle_after_day() {
+        let today = NaiveDate::from_ymd_opt(2026, 7, 29).unwrap(); // 29th
+        let since = Some("25".to_string());
+        let config = calculate_period("monthly", &since, &None, today).unwrap();
+        assert_eq!(config.period_label, "Custom");
+        assert_eq!(config.start_date_str, "2026/07/25");
+        assert_eq!(config.end_date_str, "2026/08/24");
+        assert_eq!(config.is_custom, true);
+        assert_eq!(config.period_since_formatted, Some("20260725".to_string()));
+        assert_eq!(config.period_until_formatted, Some("20260824".to_string()));
+    }
+
+    #[test]
+    fn test_calculate_dynamic_billing_cycle_before_day() {
+        let today = NaiveDate::from_ymd_opt(2026, 7, 20).unwrap(); // 20th
+        let since = Some("25th".to_string());
+        let config = calculate_period("monthly", &since, &None, today).unwrap();
+        assert_eq!(config.period_label, "Custom");
+        assert_eq!(config.start_date_str, "2026/06/25");
+        assert_eq!(config.end_date_str, "2026/07/24");
+        assert_eq!(config.is_custom, true);
+        assert_eq!(config.period_since_formatted, Some("20260625".to_string()));
+        assert_eq!(config.period_until_formatted, Some("20260724".to_string()));
     }
 }

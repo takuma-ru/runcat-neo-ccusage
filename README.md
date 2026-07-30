@@ -49,7 +49,10 @@ rn-ccusage --agent claude --period weekly --unit JPY
 # Track Codex monthly usage converted to credits (default for Codex)
 rn-ccusage --agent codex
 
-# Track a custom billing cycle period (e.g., from 25th of last month to 24th of this month)
+# Track a dynamic rolling billing cycle starting on the 25th of every month (e.g., 25th to 24th)
+rn-ccusage --agent claude --period-since 25th
+
+# Track a specific static date range (e.g., from June 25 to July 24)
 rn-ccusage --agent claude --period-since 20260625 --period-until 20260724
 ```
 
