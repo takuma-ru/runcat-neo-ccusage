@@ -1,4 +1,4 @@
-# rn-ccusage
+# runcat-neo-ccusage
 
 Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage) into [RunCat Neo](https://github.com/runcat-dev/RunCatNeo)'s custom JSON schema.
 
