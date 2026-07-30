@@ -42,7 +42,7 @@ pub fn calculate_period(
 ) -> Result<PeriodConfig, String> {
     // 1. Resolve relative macOS date arguments first
     let resolved_since = since.as_ref().and_then(|s| {
-        if s.starts_with("-v") {
+        if s.starts_with("-") {
             resolve_macos_date(s)
         } else {
             None
@@ -50,15 +50,15 @@ pub fn calculate_period(
     });
 
     let resolved_until = until.as_ref().and_then(|u| {
-        if u.starts_with("-v") {
+        if u.starts_with("-") {
             resolve_macos_date(u)
         } else {
             None
         }
     });
 
-    let effective_since = resolved_since.as_ref().or(since.as_ref().filter(|s| !s.starts_with("-v")));
-    let effective_until = resolved_until.as_ref().or(until.as_ref().filter(|u| !u.starts_with("-v")));
+    let effective_since = resolved_since.as_ref().or(since.as_ref().filter(|s| !s.starts_with("-")));
+    let effective_until = resolved_until.as_ref().or(until.as_ref().filter(|u| !u.starts_with("-")));
 
     let since_opt = effective_since.cloned();
     let until_opt = effective_until.cloned();
