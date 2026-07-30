@@ -18,7 +18,7 @@ fn main() {
         }
     };
 
-    // 1. Get Executable Directory
+    // 1. Get Executable Path and Centralized Output Directory
     let exe_path = match std::env::current_exe() {
         Ok(path) => path,
         Err(e) => {
@@ -26,18 +26,20 @@ fn main() {
             exit(1);
         }
     };
-    let exe_dir = match exe_path.parent() {
-        Some(dir) => dir,
-        None => {
-            eprintln!("Error getting current executable directory");
-            exit(1);
-        }
-    };
     let script_path = exe_path.to_string_lossy().to_string();
+
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/Users/kanekotakuma".to_string());
+    let output_dir = std::path::PathBuf::from(home_dir).join(".config").join("rn-ccusage");
+
+    // Ensure output directory exists
+    if let Err(e) = std::fs::create_dir_all(&output_dir) {
+        eprintln!("Error creating output directory '{}': {}", output_dir.display(), e);
+        exit(1);
+    }
 
     // 2. Action Routing
     if config.status {
-        show_status(&script_path, exe_dir);
+        show_status(&script_path, &output_dir);
         exit(0);
     }
 
@@ -148,8 +150,8 @@ fn main() {
     });
 
     // Write to runcat_<agent>_metrics.json
-    let out_file_path = exe_dir.join(format!("runcat_{}_metrics.json", config.agent));
-    let temp_file_path = exe_dir.join(format!("runcat_{}_metrics.json.tmp", config.agent));
+    let out_file_path = output_dir.join(format!("runcat_{}_metrics.json", config.agent));
+    let temp_file_path = output_dir.join(format!("runcat_{}_metrics.json.tmp", config.agent));
 
     let json_str = match serde_json::to_string_pretty(&output_json) {
         Ok(s) => s,
