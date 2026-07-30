@@ -13,11 +13,30 @@ pub struct PeriodConfig {
     pub period_until_formatted: Option<String>,
 }
 
-fn resolve_macos_date(arg: &str) -> Option<String> {
-    let mut date_args = Vec::new();
+fn safe_date_from_day(year: i32, month: u32, day: u32) -> NaiveDate {
+    // Find the first day of the next month
+    let next_month = if month == 12 { 1 } else { month + 1 };
+    let next_year = if month == 12 { year + 1 } else { year };
+    let next_month_first = NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap();
+
+    // The last day of the current month is the day before the first day of the next month
+    let last_day_of_month = next_month_first.pred_opt().unwrap();
+
+    // Clamp the requested day to the last day of the month
+    let clamped_day = std::cmp::min(day, last_day_of_month.day());
+
+    NaiveDate::from_ymd_opt(year, month, clamped_day).unwrap()
+}
+
+fn resolve_macos_date(arg: &str, today: NaiveDate) -> Option<String> {
+    // Use standard macOS date flags to set base date to today's date
+    let mut date_args = vec!["-j".to_string(), "-f".to_string(), "%Y%m%d".to_string()];
+
     for token in arg.split_whitespace() {
         date_args.push(token.to_string());
     }
+
+    date_args.push(today.format("%Y%m%d").to_string());
     date_args.push("+%Y%m%d".to_string());
 
     let output = std::process::Command::new("date")
@@ -40,10 +59,10 @@ pub fn calculate_period(
     until: &Option<String>,
     today: NaiveDate,
 ) -> Result<PeriodConfig, String> {
-    // 1. Resolve relative macOS date arguments first
+    // 1. Resolve relative macOS date arguments first relative to today NaiveDate!
     let resolved_since = since.as_ref().and_then(|s| {
         if s.starts_with("-") {
-            resolve_macos_date(s)
+            resolve_macos_date(s, today)
         } else {
             None
         }
@@ -51,7 +70,7 @@ pub fn calculate_period(
 
     let resolved_until = until.as_ref().and_then(|u| {
         if u.starts_with("-") {
-            resolve_macos_date(u)
+            resolve_macos_date(u, today)
         } else {
             None
         }
@@ -88,7 +107,7 @@ pub fn calculate_period(
 
     if is_dynamic_day {
         let (start_date, end_date) = if today.day() >= billing_day {
-            let start = NaiveDate::from_ymd_opt(today.year(), today.month(), billing_day).unwrap();
+            let start = safe_date_from_day(today.year(), today.month(), billing_day);
             let next_month = if today.month() == 12 {
                 1
             } else {
@@ -103,7 +122,7 @@ pub fn calculate_period(
                 let next_month_first = NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap();
                 next_month_first.pred_opt().unwrap()
             } else {
-                NaiveDate::from_ymd_opt(next_year, next_month, billing_day - 1).unwrap()
+                safe_date_from_day(next_year, next_month, billing_day - 1)
             };
             (start, end)
         } else {
@@ -117,13 +136,13 @@ pub fn calculate_period(
             } else {
                 today.year()
             };
-            let start = NaiveDate::from_ymd_opt(prev_year, prev_month, billing_day).unwrap();
+            let start = safe_date_from_day(prev_year, prev_month, billing_day);
             let end = if billing_day == 1 {
                 let current_month_first =
                     NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap();
                 current_month_first.pred_opt().unwrap()
             } else {
-                NaiveDate::from_ymd_opt(today.year(), today.month(), billing_day - 1).unwrap()
+                safe_date_from_day(today.year(), today.month(), billing_day - 1)
             };
             (start, end)
         };
@@ -143,8 +162,18 @@ pub fn calculate_period(
 
     if since_opt.is_some() || until_opt.is_some() {
         let since_str = since_opt.clone().unwrap_or_else(|| {
-            let prev_month = today - Duration::days(30);
-            prev_month.format("%Y%m%d").to_string()
+            let prev_month = if today.month() == 1 {
+                12
+            } else {
+                today.month() - 1
+            };
+            let prev_year = if today.month() == 1 {
+                today.year() - 1
+            } else {
+                today.year()
+            };
+            let since_date = safe_date_from_day(prev_year, prev_month, today.day());
+            since_date.format("%Y%m%d").to_string()
         });
         let until_str = until_opt
             .clone()
@@ -345,5 +374,15 @@ mod tests {
         assert_eq!(config.start_date_str, "2026/07/27"); // Prev Monday
         assert!(config.is_custom);
         assert_eq!(config.period_since_formatted, Some("20260727".to_string()));
+    }
+
+    #[test]
+    fn test_calculate_dynamic_billing_cycle_leap_year_clamp() {
+        let today = NaiveDate::from_ymd_opt(2026, 2, 20).unwrap(); // Feb 20, non-leap year
+        let since = Some("31st".to_string()); // requested billing day 31!
+        let config = calculate_period("monthly", &since, &None, today).unwrap();
+        assert_eq!(config.start_date_str, "2026/01/31");
+        assert_eq!(config.end_date_str, "2026/02/28"); // clamps successfully to Feb 28!
+        assert!(config.is_custom);
     }
 }

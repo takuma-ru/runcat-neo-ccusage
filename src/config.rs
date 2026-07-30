@@ -109,6 +109,9 @@ pub fn parse_args(args: Vec<String>) -> Result<Config, String> {
                 status = true;
                 i += 1;
             }
+            "-h" | "--help" => {
+                return Err("Help".to_string());
+            }
             _ => {
                 return Err(format!("Unknown option: {}", arg));
             }
@@ -151,16 +154,6 @@ pub fn parse_args(args: Vec<String>) -> Result<Config, String> {
         };
     }
 
-    if conversion_rate.is_none() {
-        let unit_lower = unit.to_lowercase();
-        conversion_rate = Some(match unit_lower.as_str() {
-            "usd" => 1.0,
-            "jpy" => 150.0,
-            "credits" => 25.0,
-            _ => 1.0,
-        });
-    }
-
     Ok(Config {
         agent,
         title,
@@ -189,7 +182,7 @@ mod tests {
         assert_eq!(config.symbol, "brain.headpoint.filled");
         assert_eq!(config.period, "monthly");
         assert_eq!(config.unit, "USD");
-        assert_eq!(config.conversion_rate, Some(1.0));
+        assert_eq!(config.conversion_rate, None);
         assert!(!config.install);
         assert!(!config.uninstall);
         assert!(!config.status);
@@ -207,7 +200,7 @@ mod tests {
         assert_eq!(config.title, "Codex");
         assert_eq!(config.symbol, "seal");
         assert_eq!(config.unit, "credits");
-        assert_eq!(config.conversion_rate, Some(25.0));
+        assert_eq!(config.conversion_rate, None);
     }
 
     #[test]

@@ -8,11 +8,40 @@ use chrono::Local;
 use std::io::Write;
 use std::process::exit;
 
+fn print_help() {
+    println!(
+        "runcat-neo-ccusage (rn-ccusage) v{}",
+        env!("CARGO_PKG_VERSION")
+    );
+    println!("Formats token and cost metrics from ccusage into RunCat Neo's custom JSON schema.\n");
+    println!("Usage:");
+    println!("  rn-ccusage [options]\n");
+    println!("Options:");
+    println!("  -a, --agent <name>     Agent to track (claude, codex, gemini, copilot, or all) [default: all]");
+    println!("  -t, --title <title>     Custom card title in RunCat Neo");
+    println!("  -s, --symbol <symbol>   Custom SF Symbol identifier (macOS)");
+    println!("  -p, --period <period>   Target retrieval period (monthly, weekly, or daily) [default: monthly]");
+    println!("  --period-since <date>   Custom retrieval start date (YYYYMMDD, YYYY-MM-DD, day of month '25', or macOS date DSL '-v-mon')");
+    println!("  --period-until <date>   Custom retrieval end date (YYYYMMDD, YYYY-MM-DD, or macOS date DSL)");
+    println!(
+        "  -U, --unit <unit>       Unit/currency to display (USD, JPY, credits, or custom text)"
+    );
+    println!("  -r, --rate <rate>       Conversion rate from USD");
+    println!("  -i, --install           Install configuration to crontab (runs every 10 minutes)");
+    println!("  -u, --uninstall         Remove configuration from crontab");
+    println!("  status                  Check status of active cron jobs and generated metrics");
+    println!("  -h, --help              Show this help message");
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let config = match config::parse_args(args) {
         Ok(cfg) => cfg,
         Err(e) => {
+            if e == "Help" {
+                print_help();
+                exit(0);
+            }
             eprintln!("Error parsing arguments: {}", e);
             exit(1);
         }
@@ -28,7 +57,7 @@ fn main() {
     };
     let script_path = exe_path.to_string_lossy().to_string();
 
-    let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/Users/kanekotakuma".to_string());
+    let home_dir = std::env::var("HOME").expect("HOME environment variable is not set!");
     let output_dir = std::path::PathBuf::from(home_dir)
         .join(".config")
         .join("rn-ccusage");
@@ -80,25 +109,31 @@ fn main() {
     };
 
     // Determine exchange rate (fetch dynamically if JPY/currency without explicit rate)
-    let mut rate = config.conversion_rate.unwrap_or(1.0);
-    if config.conversion_rate.is_none() || !config.install {
-        // If not explicitly overridden via CLI
+    let rate = if let Some(explicit_rate) = config.conversion_rate {
+        explicit_rate
+    } else {
+        // If not explicitly overridden via CLI, we can fetch live or use defaults
         let unit_lower = config.unit.to_lowercase();
         if unit_lower != "usd" && unit_lower != "credits" {
             // Attempt to fetch dynamically
             if let Some(fetched_rate) = fetch_live_rate(&config.unit) {
-                rate = fetched_rate;
+                fetched_rate
             } else {
                 // Keep default fallback
-                rate = match unit_lower.as_str() {
+                match unit_lower.as_str() {
                     "jpy" => 150.0,
                     "eur" => 0.9,
                     "gbp" => 0.8,
                     _ => 1.0,
-                };
+                }
+            }
+        } else {
+            match unit_lower.as_str() {
+                "credits" => 25.0,
+                _ => 1.0,
             }
         }
-    }
+    };
 
     // Run ccusage
     let since = period_config
@@ -253,11 +288,13 @@ fn show_status(_script_path: &str, exe_dir: &std::path::Path) {
     let ccusage_ok = std::process::Command::new("which")
         .arg("ccusage")
         .output()
-        .is_ok();
+        .map(|o| o.status.success())
+        .unwrap_or(false);
     let jq_ok = std::process::Command::new("which")
         .arg("jq")
         .output()
-        .is_ok();
+        .map(|o| o.status.success())
+        .unwrap_or(false);
     println!(
         "  - ccusage : {}",
         if ccusage_ok { "Installed" } else { "NOT FOUND" }
@@ -284,6 +321,8 @@ fn show_status(_script_path: &str, exe_dir: &std::path::Path) {
                         agent = "codex";
                     } else if line.contains("--agent gemini") {
                         agent = "gemini";
+                    } else if line.contains("--agent copilot") {
+                        agent = "copilot";
                     }
                     println!("  - {} Tracker : Enabled", agent);
                     println!("    Line: {}", line);
@@ -447,7 +486,10 @@ fn install_cron(
         exec_cmd.push_str(&format!(" --period \"{}\"", config.period));
     }
 
-    let cron_line = format!("*/10 * * * * {} > /dev/null 2>&1", exec_cmd);
+    let cron_line = format!(
+        "*/10 * * * * PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" {} > /dev/null 2>&1",
+        exec_cmd
+    );
 
     let cron_out = std::process::Command::new("crontab").arg("-l").output();
     let mut cron_lines = Vec::new();

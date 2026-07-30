@@ -17,12 +17,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - parallel:
-          - name: Run cargo fmt --check
-            run: cargo fmt --all -- --check
+      - name: Run cargo fmt --check
+        run: cargo fmt --all -- --check
 
-          - name: Run cargo clippy
-            run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-          - name: Run cargo test
-            run: cargo test --all-targets --all-features
+      - name: Run cargo test
+        run: cargo test --all-targets --all-features

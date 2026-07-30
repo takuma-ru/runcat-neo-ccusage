@@ -34,7 +34,7 @@ jobs:
 
           PATCH_COUNT=$(echo "$LABELS" | grep -F -c "release:patch" || true)
           MINOR_COUNT=$(echo "$LABELS" | grep -F -c "release:minor" || true)
-          MAJOR_COUNT=$(echo "$LABELS" | grep -E -c "release:(major|mejor)" || true)
+          MAJOR_COUNT=$(echo "$LABELS" | grep -F -c "release:major" || true)
 
           TOTAL_RELEASE_LABELS=$((PATCH_COUNT + MINOR_COUNT + MAJOR_COUNT))
 
