@@ -9,27 +9,16 @@ To run this utility, you only need:
 - RunCat Neo (with Metrics Bar enabled)
 - [ccusage](https://github.com/mscouter/ccusage) installed on your system
 
-*(Note: You **do NOT need Rust or Cargo** installed on your Mac if you use the pre-compiled binary under Option 1!)*
+*(Note: You **do NOT need Rust or Cargo** installed on your Mac if you use the pre-compiled binary!)*
 
 *Note: Unlike the shell script version, the compiled Rust binary has **zero dependency on jq, bc, or custom date commands**, ensuring complete execution safety under background cron environments.*
 
-## Installation & Compilation
+## Installation
 
-### Option 1: Download Pre-compiled Universal Binary (Recommended)
-
-You don't need Rust or Cargo installed. Simply download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively) from our latest release:
+Simply download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively) from our latest release:
 
 ```bash
 curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/runcat-neo-ccusage-mac.tar.gz | tar -xz
-```
-
-### Option 2: Build from Source
-
-If you prefer to build from source, ensure you have the Rust toolchain installed, then run:
-
-```bash
-cargo build --release
-cp target/release/runcat-neo-ccusage .
 ```
 
 ## Usage
