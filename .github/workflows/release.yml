@@ -16,17 +16,81 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
 
-      - name: Extract version from Cargo.toml
+      - name: Determine SemVer Bump from merged PR
         id: get_version
         run: |
-          VERSION=$(grep '^version =' Cargo.toml | head -n1 | cut -d'"' -f2)
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          COMMIT_SHA="${{ github.sha }}"
+          echo "Commit SHA: $COMMIT_SHA"
+
+          # 1. Fetch associated PR data using gh api
+          PR_DATA=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/pulls)
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "No associated PR found. Defaulting to patch bump."
+            BUMP_TYPE="patch"
+          else
+            echo "Associated PR found: #$PR_NUMBER"
+            # Get PR labels
+            LABELS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.labels[].name' 2>/dev/null || true)
+            echo "PR Labels:"
+            echo "$LABELS"
+
+            if echo "$LABELS" | grep -F -q "release:major"; then
+              BUMP_TYPE="major"
+            elif echo "$LABELS" | grep -F -q "release:minor"; then
+              BUMP_TYPE="minor"
+            elif echo "$LABELS" | grep -F -q "release:patch"; then
+              BUMP_TYPE="patch"
+            else
+              BUMP_TYPE="patch"
+            fi
+          fi
+          echo "Bump Type: $BUMP_TYPE"
+
+          # 2. Get current version from latest git tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest Tag found: $LATEST_TAG"
+
+          # Strip 'v' prefix
+          CURRENT_VERSION=${LATEST_TAG#v}
+          echo "Current Version: $CURRENT_VERSION"
+
+          # Split version into components
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+
+          case "$BUMP_TYPE" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch|*)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          NEW_VERSION="${major}.${minor}.${patch}"
+          echo "New calculated version: $NEW_VERSION"
+          echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # 3. Update Cargo.toml locally before compiling to bake-in the version
+          sed -i '' "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+          echo "Updated Cargo.toml version to $NEW_VERSION"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Apple Silicon binary
         run: cargo build --release --target aarch64-apple-darwin
