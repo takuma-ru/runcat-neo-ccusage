@@ -9,8 +9,6 @@ To run this utility, you only need:
 - RunCat Neo (with Metrics Bar enabled)
 - [ccusage](https://github.com/mscouter/ccusage) installed on your system
 
-*Note: Unlike the shell script version, the compiled Rust binary has **zero dependency on jq, bc, or custom date commands**, ensuring complete execution safety under background cron environments.*
-
 ## Installation
 
 Simply download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively) from our latest release:
