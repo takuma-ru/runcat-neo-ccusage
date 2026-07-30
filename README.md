@@ -2,6 +2,9 @@
 
 Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage) into [RunCat Neo](https://github.com/runcat-dev/RunCatNeo)'s custom JSON schema.
 
+<img width="1226" height="768" alt="画面収録 2026-07-30 19 19 44" src="https://github.com/user-attachments/assets/ad697d8e-6f67-4da2-871c-27c2d0839d7c" />
+
+
 ## Features
 
 - **Zero Runtime Dependencies:** The compiled single-binary has zero dependency on `jq`, `bc`, or custom shell date utilities.
