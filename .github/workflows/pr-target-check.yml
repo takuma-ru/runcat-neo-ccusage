@@ -1,0 +1,26 @@
+name: PR Target Validator
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-branch:
+    name: Validate Base and Head Branches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch relationship
+        run: |
+          HEAD_BRANCH="${{ github.head_ref }}"
+          echo "PR Source Branch: $HEAD_BRANCH"
+          echo "PR Target Branch: main"
+
+          if [ "$HEAD_BRANCH" = "develop" ] || [[ "$HEAD_BRANCH" =~ ^hotfix/ ]]; then
+            echo "✓ Valid branch flow: $HEAD_BRANCH -> main"
+            exit 0
+          else
+            echo "❌ Error: Merges to main are ONLY allowed from 'develop' or 'hotfix/*' branches!" >&2
+            echo "Please close this PR and merge your changes into 'develop' first, or rename your branch." >&2
+            exit 1
+          fi
