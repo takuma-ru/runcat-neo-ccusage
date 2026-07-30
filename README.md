@@ -16,13 +16,21 @@ To run this utility, you only need:
 - RunCat Neo (with Metrics Bar enabled)
 - [ccusage](https://github.com/ccusage/ccusage) installed
 
-## Installation
+## Getting Started
+
+### 1. Install runcat-neo-ccusage
 
 Download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively):
 
 ```bash
 curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/runcat-neo-ccusage-mac.tar.gz | tar -xz
 ```
+
+### 2. Configure RunCat Neo
+
+1. Open RunCat Neo **Settings** > **Metrics** > **Custom Metrics**.
+2. Click **Add Custom Metrics Source** and select the generated JSON file inside this repository (e.g., `runcat_claude_metrics.json`).
+3. Enable **Metrics Bar** and toggle the new source to On.
 
 ## Usage & Examples
 
@@ -72,12 +80,6 @@ Install, uninstall, or view system status:
   -u, --uninstall         Remove configuration from crontab
   -h, --help              Show this help message
 ```
-
-## RunCat Neo Configuration
-
-1. Open RunCat Neo **Settings** > **Metrics** > **Custom Metrics**.
-2. Click **Add Custom Metrics Source** and select the generated JSON file inside this repository (e.g., `runcat_claude_metrics.json`).
-3. Enable **Metrics Bar** and toggle the new source to On.
 
 ## License
 
