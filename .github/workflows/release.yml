@@ -22,6 +22,12 @@ jobs:
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
 
+      - name: Extract version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -n1 | cut -d'"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Build Apple Silicon binary
         run: cargo build --release --target aarch64-apple-darwin
 
@@ -40,8 +46,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: "Latest Release"
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: "Release v${{ steps.get_version.outputs.VERSION }}"
           prerelease: false
           files: |
             rn-ccusage-mac.tar.gz
