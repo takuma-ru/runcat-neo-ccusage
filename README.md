@@ -1,6 +1,6 @@
 # runcat-neo-ccusage
 
-Formats token and cost metrics from [ccusage](https://github.com/mscouter/ccusage) into [RunCat Neo](https://github.com/kyome/RunCat-Neo)'s custom JSON schema.
+Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage) into [RunCat Neo](https://github.com/runcat-dev/RunCatNeo)'s custom JSON schema.
 
 ## Features
 
@@ -14,7 +14,7 @@ Formats token and cost metrics from [ccusage](https://github.com/mscouter/ccusag
 To run this utility, you only need:
 - macOS
 - RunCat Neo (with Metrics Bar enabled)
-- [ccusage](https://github.com/mscouter/ccusage) installed
+- [ccusage](https://github.com/ccusage/ccusage) installed
 
 ## Installation
 
