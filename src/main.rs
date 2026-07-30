@@ -221,7 +221,7 @@ fn show_status(_script_path: &str, exe_dir: &std::path::Path) {
         if out.status.success() {
             let cron_str = String::from_utf8_lossy(&out.stdout);
             for line in cron_str.lines() {
-                if line.contains("runcat-neo-ccusage") {
+                if line.contains("rn-ccusage") {
                     found_jobs = true;
                     let mut agent = "all";
                     if line.contains("--agent claude") {
@@ -293,7 +293,7 @@ fn uninstall_cron(_script_path: &str, agent: &str) {
         if out.status.success() {
             let cron_str = String::from_utf8_lossy(&out.stdout);
             for line in cron_str.lines() {
-                if line.contains("runcat-neo-ccusage") && line.contains(&filter_str) {
+                if line.contains("rn-ccusage") && line.contains(&filter_str) {
                     // Skip this line to uninstall it
                     continue;
                 }

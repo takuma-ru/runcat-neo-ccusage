@@ -30,17 +30,17 @@ jobs:
 
       - name: Create Universal Binary
         run: |
-          lipo -create -output runcat-neo-ccusage \
-            target/aarch64-apple-darwin/release/runcat-neo-ccusage \
-            target/x86_64-apple-darwin/release/runcat-neo-ccusage
+          lipo -create -output rn-ccusage \
+            target/aarch64-apple-darwin/release/rn-ccusage \
+            target/x86_64-apple-darwin/release/rn-ccusage
 
       - name: Archive production binary
-        run: tar -czf runcat-neo-ccusage-mac.tar.gz runcat-neo-ccusage
+        run: tar -czf rn-ccusage-mac.tar.gz rn-ccusage
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            runcat-neo-ccusage-mac.tar.gz
+            rn-ccusage-mac.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

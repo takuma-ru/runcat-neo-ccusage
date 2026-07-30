@@ -1,6 +1,6 @@
 *.json
 *.tmp
-runcat-neo-ccusage
+rn-ccusage
 
 # Added by cargo
 /target

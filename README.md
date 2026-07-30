@@ -1,4 +1,4 @@
-# runcat-neo-ccusage
+# rn-ccusage
 
 Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage) into [RunCat Neo](https://github.com/runcat-dev/RunCatNeo)'s custom JSON schema.
 
@@ -7,7 +7,7 @@ Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage
 - **Zero Runtime Dependencies:** The compiled single-binary has zero dependency on `jq`, `bc`, or custom shell date utilities.
 - **Multi-Currency & Conversion:** Supports `USD`, `JPY` (with live dynamic exchange rate fetching and offline fallback), `EUR`, `GBP`, `credits` (default for Codex), or any custom unit.
 - **Flexible Ranges:** Track monthly, weekly, daily, or custom billing cycles with `--period-since` and `--period-until`.
-- **Diagnostic Dashboard:** Run `./runcat-neo-ccusage status` to view active cron jobs, tool status, and generated JSON values.
+- **Diagnostic Dashboard:** Run `./rn-ccusage status` to view active cron jobs, tool status, and generated JSON values.
 
 ## Prerequisites
 
@@ -18,12 +18,12 @@ To run this utility, you only need:
 
 ## Getting Started
 
-### 1. Install runcat-neo-ccusage
+### 1. Install rn-ccusage
 
 Download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively):
 
 ```bash
-curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/runcat-neo-ccusage-mac.tar.gz | tar -xz
+curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/rn-ccusage-mac.tar.gz | tar -xz
 ```
 
 ### 2. Configure RunCat Neo
@@ -39,16 +39,16 @@ Generate metrics JSON manually for your agents:
 
 ```bash
 # Track global monthly usage (All Agents) in USD
-./runcat-neo-ccusage --agent all
+./rn-ccusage --agent all
 
 # Track Claude weekly usage in JPY
-./runcat-neo-ccusage --agent claude --period weekly --unit JPY
+./rn-ccusage --agent claude --period weekly --unit JPY
 
 # Track Codex monthly usage converted to credits (default for Codex)
-./runcat-neo-ccusage --agent codex
+./rn-ccusage --agent codex
 
 # Track a custom billing cycle period (e.g., from 25th of last month to 24th of this month)
-./runcat-neo-ccusage --agent claude --period-since 20260625 --period-until 20260724
+./rn-ccusage --agent claude --period-since 20260625 --period-until 20260724
 ```
 
 ### Automation & Diagnostics
@@ -56,13 +56,13 @@ Install, uninstall, or view system status:
 
 ```bash
 # Register background auto-update (runs every 10 minutes)
-./runcat-neo-ccusage --agent claude --period weekly --unit JPY --install
+./rn-ccusage --agent claude --period weekly --unit JPY --install
 
 # Remove background auto-update for an agent
-./runcat-neo-ccusage --agent claude --uninstall
+./rn-ccusage --agent claude --uninstall
 
 # Check status of active cron jobs and generated metrics
-./runcat-neo-ccusage status
+./rn-ccusage status
 ```
 
 ## Options Reference
