@@ -13,7 +13,17 @@ runcat-neo-ccusage is a high-performance, single-binary Rust utility that format
 
 ## Installation & Compilation
 
-Clone this repository and compile the binary from source:
+### Option 1: Download Pre-compiled Universal Binary (Recommended)
+
+You don't need Rust or Cargo installed. Simply download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively) from our latest release:
+
+```bash
+curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/runcat-neo-ccusage-mac.tar.gz | tar -xz
+```
+
+### Option 2: Build from Source
+
+If you prefer to build from source, ensure you have the Rust toolchain installed, then run:
 
 ```bash
 cargo build --release
