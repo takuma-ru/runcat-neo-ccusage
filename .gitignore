@@ -1,2 +1,6 @@
 *.json
 *.tmp
+rn-ccusage
+
+# Added by cargo
+/target
