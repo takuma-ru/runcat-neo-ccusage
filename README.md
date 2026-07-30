@@ -7,7 +7,7 @@ Formats token and cost metrics from [ccusage](https://github.com/ccusage/ccusage
 - **Zero Runtime Dependencies:** The compiled single-binary has zero dependency on `jq`, `bc`, or custom shell date utilities.
 - **Multi-Currency & Conversion:** Supports `USD`, `JPY` (with live dynamic exchange rate fetching and offline fallback), `EUR`, `GBP`, `credits` (default for Codex), or any custom unit.
 - **Flexible Ranges:** Track monthly, weekly, daily, or custom billing cycles with `--period-since` and `--period-until`.
-- **Diagnostic Dashboard:** Run `./rn-ccusage status` to view active cron jobs, tool status, and generated JSON values.
+- **Diagnostic Dashboard:** Run `rn-ccusage status` to view active cron jobs, tool status, and generated JSON values.
 
 ## Prerequisites
 
@@ -20,35 +20,37 @@ To run this utility, you only need:
 
 ### 1. Install rn-ccusage
 
-Download the pre-compiled universal binary (supporting both Apple Silicon M1/M2/M3 and Intel Macs natively):
+Download and extract the pre-compiled universal binary, then move it to your system `PATH` (e.g., `~/.local/bin/` or `/usr/local/bin/`):
 
 ```bash
 curl -L https://github.com/takuma-ru/runcat-neo-ccusage/releases/latest/download/rn-ccusage-mac.tar.gz | tar -xz
+mv rn-ccusage ~/.local/bin/
 ```
 
 ### 2. Configure RunCat Neo
 
 1. Open RunCat Neo **Settings** > **Metrics** > **Custom Metrics**.
-2. Click **Add Custom Metrics Source** and select the generated JSON file inside this repository (e.g., `runcat_claude_metrics.json`).
+2. Click **Add Custom Metrics Source** and select the generated JSON file inside your central config directory:
+   `~/.config/rn-ccusage/runcat_claude_metrics.json`
 3. Enable **Metrics Bar** and toggle the new source to On.
 
 ## Usage & Examples
 
 ### Manual Execution
-Generate metrics JSON manually for your agents:
+Generate metrics JSON manually for your agents (outputted centrally under `~/.config/rn-ccusage/`):
 
 ```bash
 # Track global monthly usage (All Agents) in USD
-./rn-ccusage --agent all
+rn-ccusage --agent all
 
 # Track Claude weekly usage in JPY
-./rn-ccusage --agent claude --period weekly --unit JPY
+rn-ccusage --agent claude --period weekly --unit JPY
 
 # Track Codex monthly usage converted to credits (default for Codex)
-./rn-ccusage --agent codex
+rn-ccusage --agent codex
 
 # Track a custom billing cycle period (e.g., from 25th of last month to 24th of this month)
-./rn-ccusage --agent claude --period-since 20260625 --period-until 20260724
+rn-ccusage --agent claude --period-since 20260625 --period-until 20260724
 ```
 
 ### Automation & Diagnostics
@@ -56,13 +58,13 @@ Install, uninstall, or view system status:
 
 ```bash
 # Register background auto-update (runs every 10 minutes)
-./rn-ccusage --agent claude --period weekly --unit JPY --install
+rn-ccusage --agent claude --period weekly --unit JPY --install
 
 # Remove background auto-update for an agent
-./rn-ccusage --agent claude --uninstall
+rn-ccusage --agent claude --uninstall
 
 # Check status of active cron jobs and generated metrics
-./rn-ccusage status
+rn-ccusage status
 ```
 
 ## Options Reference
