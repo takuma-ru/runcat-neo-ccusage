@@ -55,7 +55,7 @@ rn-ccusage --agent claude --period-since 25th
 # Track a dynamic rolling period using macOS relative date offsets or epochs (e.g., "-v-mon" or "-r 1711111111")
 rn-ccusage --agent claude --period-since "-v-mon"
 
-# Track a specific static date range (e.g., from June 25 to July 24)
+# Query a specific historical date range (static)
 rn-ccusage --agent claude --period-since 20260625 --period-until 20260724
 ```
 
