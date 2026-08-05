@@ -515,9 +515,35 @@ fn install_cron(
         exec_cmd.push_str(&format!(" --period \"{}\"", sanitized_period));
     }
 
+    let mut path_env = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string();
+
+    // If mise is used, prepend its shims directory so dependent runtimes like Node.js can be resolved.
+    if let Ok(home) = std::env::var("HOME") {
+        let mise_shims = std::path::Path::new(&home)
+            .join(".local")
+            .join("share")
+            .join("mise")
+            .join("shims");
+        if mise_shims.exists() {
+            path_env = format!("{}:{}", mise_shims.to_string_lossy(), path_env);
+        }
+    }
+
+    if let Ok(ccusage_path) = std::process::Command::new("which").arg("ccusage").output() {
+        if ccusage_path.status.success() {
+            let path_str = String::from_utf8_lossy(&ccusage_path.stdout);
+            if let Some(parent) = std::path::Path::new(path_str.trim()).parent() {
+                let parent_str = parent.to_string_lossy().to_string();
+                if !path_env.contains(&parent_str) {
+                    path_env = format!("{}:{}", parent_str, path_env);
+                }
+            }
+        }
+    }
+
     let cron_line = format!(
-        "*/10 * * * * PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" {} > /dev/null 2>&1",
-        exec_cmd
+        "*/10 * * * * PATH=\"{}:$PATH\" {} > /dev/null 2>&1",
+        path_env, exec_cmd
     );
 
     let cron_out = std::process::Command::new("crontab").arg("-l").output();
