@@ -543,8 +543,7 @@ fn install_cron(
 
     let cron_line = format!(
         "*/10 * * * * PATH=\"{}:$PATH\" {} > /dev/null 2>&1",
-        path_env,
-        exec_cmd
+        path_env, exec_cmd
     );
 
     let cron_out = std::process::Command::new("crontab").arg("-l").output();
