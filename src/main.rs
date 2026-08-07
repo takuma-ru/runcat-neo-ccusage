@@ -173,17 +173,15 @@ fn main() {
 
     loop {
         let ccusage_output_res = execute_ccusage(&ccusage_args);
-        
+
         let parse_res = match ccusage_output_res {
-            Ok(output) => {
-                parser::parse_json(
-                    &output,
-                    period_config.is_custom,
-                    &period_config.json_array_key,
-                    &period_config.date_field_query,
-                    &period_config.current_date_str,
-                )
-            }
+            Ok(output) => parser::parse_json(
+                &output,
+                period_config.is_custom,
+                &period_config.json_array_key,
+                &period_config.date_field_query,
+                &period_config.current_date_str,
+            ),
             Err(e) => Err(format!("Error executing ccusage: {}", e)),
         };
 
@@ -245,7 +243,8 @@ fn main() {
 
             // Write fallback metrics to runcat_<agent>_metrics.json
             let out_file_path = output_dir.join(format!("runcat_{}_metrics.json", config.agent));
-            let temp_file_path = output_dir.join(format!("runcat_{}_metrics.json.tmp", config.agent));
+            let temp_file_path =
+                output_dir.join(format!("runcat_{}_metrics.json.tmp", config.agent));
 
             if let Ok(json_str) = serde_json::to_string_pretty(&fallback_json) {
                 if std::fs::write(&temp_file_path, &json_str).is_ok() {
