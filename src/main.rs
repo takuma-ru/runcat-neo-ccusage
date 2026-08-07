@@ -166,25 +166,93 @@ fn main() {
         }
     };
 
-    let ccusage_output = match execute_ccusage(&ccusage_args) {
-        Ok(out) => out,
-        Err(e) => {
-            eprintln!("Error executing ccusage: {}", e);
-            exit(1);
-        }
-    };
+    let mut retry_count = 0;
+    let max_retries = 10;
+    let mut last_error_msg = String::new();
+    let mut result_data: Option<(f64, u64)> = None;
 
-    // Parse JSON
-    let (cost_usd, tokens) = match parser::parse_json(
-        &ccusage_output,
-        period_config.is_custom,
-        &period_config.json_array_key,
-        &period_config.date_field_query,
-        &period_config.current_date_str,
-    ) {
-        Ok(val) => val,
-        Err(e) => {
-            eprintln!("Error parsing ccusage output: {}", e);
+    loop {
+        let ccusage_output_res = execute_ccusage(&ccusage_args);
+        
+        let parse_res = match ccusage_output_res {
+            Ok(output) => {
+                parser::parse_json(
+                    &output,
+                    period_config.is_custom,
+                    &period_config.json_array_key,
+                    &period_config.date_field_query,
+                    &period_config.current_date_str,
+                )
+            }
+            Err(e) => Err(format!("Error executing ccusage: {}", e)),
+        };
+
+        match parse_res {
+            Ok(val) => {
+                result_data = Some(val);
+                break;
+            }
+            Err(e) => {
+                last_error_msg = e;
+                retry_count += 1;
+                if retry_count >= max_retries {
+                    break;
+                }
+                eprintln!(
+                    "Attempt {}/{} failed: {}. Retrying in 1 minute...",
+                    retry_count, max_retries, last_error_msg
+                );
+                std::thread::sleep(std::time::Duration::from_secs(60));
+            }
+        }
+    }
+
+    let (cost_usd, tokens) = match result_data {
+        Some(val) => val,
+        None => {
+            eprintln!(
+                "Failed to get valid metrics after {} attempts. Last error: {}",
+                max_retries, last_error_msg
+            );
+
+            // Build Fallback Output JSON with '--' placeholder values
+            let fallback_json = serde_json::json!({
+                "title": config.title,
+                "symbol": config.symbol,
+                "metricsBarValue": "--",
+                "lastUpdatedDate": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                "metrics": [
+                    {
+                        "title": "Tokens",
+                        "formattedValue": "--"
+                    },
+                    {
+                        "title": if config.unit.is_empty() {
+                            "Cost"
+                        } else if config.unit.to_lowercase() == "credits" {
+                            "Credits"
+                        } else {
+                            &config.unit
+                        },
+                        "formattedValue": "--"
+                    },
+                    {
+                        "title": "Period",
+                        "formattedValue": format!("{} - {}", period_config.start_date_str, period_config.end_date_str)
+                    }
+                ]
+            });
+
+            // Write fallback metrics to runcat_<agent>_metrics.json
+            let out_file_path = output_dir.join(format!("runcat_{}_metrics.json", config.agent));
+            let temp_file_path = output_dir.join(format!("runcat_{}_metrics.json.tmp", config.agent));
+
+            if let Ok(json_str) = serde_json::to_string_pretty(&fallback_json) {
+                if std::fs::write(&temp_file_path, &json_str).is_ok() {
+                    let _ = std::fs::rename(&temp_file_path, &out_file_path);
+                }
+            }
+
             exit(1);
         }
     };
